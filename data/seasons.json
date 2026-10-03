@@ -1,0 +1,178 @@
+{
+  "generated": "2026-10-03",
+  "min_pa": 300,
+  "min_ip": 50,
+  "seasons": [
+    {
+      "season": 2016,
+      "label": "2016",
+      "cap": 189000000,
+      "players": 596,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2017,
+      "label": "2017",
+      "cap": 195000000,
+      "players": 642,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2018,
+      "label": "2018",
+      "cap": 197000000,
+      "players": 613,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2019,
+      "label": "2019",
+      "cap": 206000000,
+      "players": 614,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2021,
+      "label": "2021",
+      "cap": 210000000,
+      "players": 599,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2022,
+      "label": "2022",
+      "cap": 230000000,
+      "players": 623,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2023,
+      "label": "2023",
+      "cap": 233000000,
+      "players": 649,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2024,
+      "label": "2024",
+      "cap": 237000000,
+      "players": 637,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2025,
+      "label": "2025",
+      "cap": 241000000,
+      "players": 616,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "test",
+        "train"
+      ]
+    },
+    {
+      "season": 2026,
+      "label": "2026",
+      "cap": 244000000,
+      "players": 593,
+      "has_salary": true,
+      "salary_source": null,
+      "splits": [
+        "projection"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "market",
+      "label": "Market value",
+      "short": "Market",
+      "r2": 0.61,
+      "description": "Age- and service-aware. Learns how MLB actually pays."
+    },
+    {
+      "id": "production",
+      "label": "Production value",
+      "short": "Production",
+      "r2": 0.22,
+      "description": "Stats only. Closer to pure on-field worth."
+    }
+  ],
+  "teams": [
+    "2TM",
+    "3TM",
+    "5TM",
+    "ARI",
+    "ATH",
+    "ATL",
+    "BAL",
+    "BOS",
+    "CHC",
+    "CHW",
+    "CIN",
+    "CLE",
+    "COL",
+    "DET",
+    "HOU",
+    "KCR",
+    "LAA",
+    "LAD",
+    "MIA",
+    "MIL",
+    "MIN",
+    "NYM",
+    "NYY",
+    "PHI",
+    "PIT",
+    "SDP",
+    "SEA",
+    "SFG",
+    "STL",
+    "TBR",
+    "TEX",
+    "TOR",
+    "WSN"
+  ],
+  "files": "data/{season}-{model}.json"
+}

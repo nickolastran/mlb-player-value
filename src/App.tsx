@@ -7,6 +7,7 @@ import { PlayerCard } from "./PlayerCard";
 import { Leaderboard } from "./Leaderboard";
 import { Scatters, TeamBars } from "./Charts";
 import { Method } from "./Method";
+import { Footer } from "./Footer";
 
 const WRAP = "mx-auto max-w-[1180px] px-[clamp(16px,4vw,32px)]";
 const SECTION = `${WRAP} pt-[clamp(32px,5vw,56px)]`;
@@ -287,17 +288,7 @@ function Explorer({ db }: { db: Db }) {
         <Method db={db} />
       </main>
 
-      <footer className="mt-[72px] border-t border-line">
-        <div className={`${WRAP} flex flex-wrap justify-between gap-2 pb-8 pt-[22px] text-ink-2`}>
-          <p>
-            Adapted from{" "}
-            <a href="https://github.com/seijiama/nba-player-value" rel="noopener" className="underline decoration-line-strong underline-offset-[3px] hover:decoration-bulb">
-              Seiji Ma's NBA Player Value
-            </a>.
-          </p>
-          <p className="text-sm text-muted">Data through {latest.label}. Updated {db.manifest.generated}.</p>
-        </div>
-      </footer>
+      <Footer db={db} />
     </>
   );
 }

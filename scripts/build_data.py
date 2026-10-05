@@ -4,7 +4,7 @@
 Usage (from the repo root):
 
     python scripts/scrape.py       # slow: refresh stats and salaries (cached)
-    python scripts/build_data.py   # fast: train models, write data/
+    python scripts/build_data.py   # fast: train models, write public/data/
 
 Models (random forests, one pair for hitters and one for pitchers), predicting
 salary as a share of that season's luxury-tax (CBT) threshold:
@@ -17,8 +17,8 @@ Seasons before the latest are split 80/20 into train/test. The latest season
 is never trained on, so it's fully out-of-sample.
 
 Output:
-    data/<season>-<model>.json   one file per season and model
-    data/seasons.json            seasons, models, thresholds and teams
+    public/data/<season>-<model>.json   one file per season and model
+    public/data/seasons.json          seasons, models, thresholds and teams
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from sklearn.model_selection import train_test_split
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "player-seasons.csv"
-DATA_DIR = ROOT / "data"
+DATA_DIR = ROOT / "public" / "data"
 
 # Competitive balance tax threshold by season, in dollars. MLB has no salary
 # cap; this is the closest thing, and it puts every season on one scale.
@@ -175,7 +175,7 @@ def main() -> None:
         "files": "data/{season}-{model}.json",
     }
     (DATA_DIR / "seasons.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
-    print(f"Wrote {len(seasons) * len(MODELS)} season files and data/seasons.json")
+    print(f"Wrote {len(seasons) * len(MODELS)} season files and public/data/seasons.json")
 
 
 if __name__ == "__main__":

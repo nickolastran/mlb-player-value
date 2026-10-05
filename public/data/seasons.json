@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-03",
+  "generated": "2026-10-05",
   "min_pa": 300,
   "min_ip": 50,
   "seasons": [
@@ -140,9 +140,6 @@
     }
   ],
   "teams": [
-    "2TM",
-    "3TM",
-    "5TM",
     "ARI",
     "ATH",
     "ATL",

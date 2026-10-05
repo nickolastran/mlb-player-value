@@ -109,7 +109,7 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
     for _, r in rows.sort_values("pred", ascending=False).iterrows():
         paid = pd.notna(r["Salary"])
         rec = {
-            "id": r["bref_id"], "player": r["Player"], "team": r["Team"], "pos": r["Pos"],
+            "id": r["bref_id"], "player": r["Player"], "team": r["Team"], "traded": bool(r["Traded"]), "pos": r["Pos"],
             "role": r["Role"], "age": num(r["Age"]), "service": num(r["Service"], 2),
             "g": num(r["G"]), "war": num(r["WAR"], 1),
             "salary": num(r["Salary"]), "salary_est": bool(r["Salary_est"]),
@@ -148,7 +148,7 @@ def main() -> None:
     print(f"Test R²: {r2}")
 
     DATA_DIR.mkdir(exist_ok=True)
-    for old in DATA_DIR.glob("*.json"):
+    for old in DATA_DIR.glob("[0-9]*-*.json"):  # season files only; mlbam.json is player_ids.py's
         old.unlink()
     seasons = []
     for season in sorted(df["Season"].unique()):

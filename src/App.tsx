@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
-import { isTraded, loadDb, money, SORTS, teamName, type Db, type ModelId, type SortDir, type SortKey, type Unit } from "./lib";
+import { loadDb, money, SORTS, teamName, type Db, type ModelId, type SortDir, type SortKey, type Unit } from "./lib";
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
 import { PlayerCard } from "./PlayerCard";
@@ -122,7 +122,7 @@ function Explorer({ db }: { db: Db }) {
 
   const seasons = db.manifest.seasons;
   const latest = seasons[seasons.length - 1];
-  const teams = db.manifest.teams.filter((t) => !isTraded(t)).sort((a, b) => teamName(a).localeCompare(teamName(b)));
+  const teams = [...db.manifest.teams].sort((a, b) => teamName(a).localeCompare(teamName(b)));
 
   // The season's two extremes, shown in the masthead.
   const paid = db.recs(s.season, s.model).filter((r) => r.surplus != null);

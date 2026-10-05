@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Config, Data, Layout, PlotMouseEvent } from "plotly.js-dist-min";
 import {
-  C, escapeHtml, FONT, isTraded, jitter, money, pct, seasonColor, teamColor, teamLogo, teamName,
+  C, escapeHtml, FONT, jitter, money, pct, seasonColor, teamColor, teamLogo, teamName,
   type Db, type ModelId, type Rec, type Unit,
 } from "./lib";
 import { EASE, Segmented } from "./ui";
@@ -306,7 +306,7 @@ export function TeamBars({ db, season, model, team }: { db: Db; season: number; 
       }
       const sums = new Map<string, { usd: number; pct: number; n: number }>();
       for (const r of db.recs(season, model)) {
-        if (r.salary == null || isTraded(r.team)) continue;
+        if (r.salary == null || r.traded) continue;
         const t = sums.get(r.team) ?? { usd: 0, pct: 0, n: 0 };
         t.usd += r.surplus!; t.pct += r.surplus_pct!; t.n += 1;
         sums.set(r.team, t);

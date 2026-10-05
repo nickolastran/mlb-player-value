@@ -189,11 +189,12 @@ def fill_gap(pay: dict, drafted: bool, season: int) -> tuple[float | None, float
 
 
 def first_rows(page: str, table_id: str) -> dict[str, dict]:
-    """{player id: row}. A traded player's first row is his season total (2TM)."""
+    """{player id: row}. A traded player's first row is his season total (2TM);
+    his later rows are one per team in order, so the last one sets "last_team"."""
     out: dict[str, dict] = {}
     for r in table_rows(page, table_id):
         if "id" in r:
-            out.setdefault(r["id"], r)
+            out.setdefault(r["id"], r)["last_team"] = r.get("team_name_abbr", "")
     return out
 
 
@@ -214,12 +215,13 @@ def season_rows(season: int) -> list[dict]:
         if not hitter:
             b = {k: v for k, v in b.items() if k == "b_war"}  # a pitcher's few at-bats aren't his stat line
         g, gs = f(p.get("p_g")) or 0, f(p.get("p_gs")) or 0
-        team = src.get("team_name_abbr", "")
+        team = src["last_team"]
         out.append({
             "Season": season,
             "bref_id": pid,
             "Player": src["name_display"].rstrip("*#+ "),
             "Team": TEAM_ALIASES.get(team, team),
+            "Traded": bool(re.fullmatch(r"\dTM", src.get("team_name_abbr", ""))),
             "Role": "H" if hitter else "P",
             "Pos": main_position(b.get("pos", "")) if hitter else ("SP" if gs >= g / 2 else "RP"),
             "Age": f(src.get("age")),
@@ -246,7 +248,8 @@ def main() -> None:
     print(f"Fetching salaries for {len(ids)} players (cached pages are instant)", flush=True)
     played_for: dict[str, dict[int, str]] = {}
     for r in rows:
-        played_for.setdefault(r["bref_id"], {})[r["Season"]] = r["Team"]
+        # A traded player's salary can be listed under any of his teams, so it isn't checked.
+        played_for.setdefault(r["bref_id"], {})[r["Season"]] = "" if r["Traded"] else r["Team"]
     pay = {}
     for i, pid in enumerate(ids, 1):
         pay[pid] = salaries(pid, played_for[pid])

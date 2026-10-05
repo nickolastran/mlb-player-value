@@ -8,7 +8,8 @@ export type SortDir = "asc" | "desc";
 export interface Rec {
   id: string;
   player: string;
-  team: string;
+  team: string; // last team played for
+  traded: boolean;
   pos: string;
   role: "H" | "P";
   age: number;
@@ -172,8 +173,7 @@ const TEAMS: Record<string, [string, string, number]> = {
   TOR: ["Toronto Blue Jays", "#3d8be0", 141],
   WSN: ["Washington Nationals", "#e2465a", 120],
 };
-export const isTraded = (code: string) => /^\dTM$/.test(code);
-export const teamName = (code: string) => TEAMS[code]?.[0] ?? (isTraded(code) ? `${code[0]} teams (traded)` : code);
+export const teamName = (code: string) => TEAMS[code]?.[0] ?? code;
 export const teamColor = (code: string) => TEAMS[code]?.[1] ?? "#7c8894";
 export const teamLogo = (code: string) =>
   TEAMS[code] ? `https://www.mlbstatic.com/team-logos/team-cap-on-dark/${TEAMS[code][2]}.svg` : null;

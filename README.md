@@ -7,12 +7,14 @@ What MLB players *should* earn based on their production, next to what they're a
 
 | Path | What it is |
 |---|---|
-| `index.html`, `styles.css`, `app.js` | The site |
+| `src/` | The site: React + TypeScript (`.tsx`), styled with Tailwind, animated with Motion, charts with Plotly |
 | `player-seasons.csv` | Source data: one row per qualifying player-season, with stats, salary and service time |
-| `data/<season>-<model>.json` | One file per season and model, read by the site |
-| `data/seasons.json` | Seasons, models (with test R²), tax thresholds and teams |
+| `public/data/<season>-<model>.json` | One file per season and model, read by the site |
+| `public/data/seasons.json` | Seasons, models (with test R²), tax thresholds and teams |
+| `public/data/mlbam.json` | Baseball-Reference ID → MLB ID, used for player headshots |
 | `scripts/scrape.py` | Downloads stats and salaries from Baseball-Reference into `player-seasons.csv` |
-| `scripts/build_data.py` | Trains the models and writes everything in `data/` |
+| `scripts/build_data.py` | Trains the models and writes everything in `public/data/` |
+| `scripts/player_ids.py` | Maps players to MLB IDs via the Chadwick Bureau register, for headshots |
 
 ## Updating the data
 
@@ -21,6 +23,7 @@ You need Python 3.9+ with `pip install pandas scikit-learn requests`.
 ```bash
 python scripts/scrape.py       # slow the first time: ~2,000 player pages at 4 s each
 python scripts/build_data.py   # seconds
+python scripts/player_ids.py   # seconds; only needed when new players appear
 ```
 
 `scrape.py` caches every page in `.cache/`, so reruns only fetch what's missing. It waits 4 seconds between requests because Baseball-Reference blocks clients that go over about 20 a minute. To refresh a page (say, a season still in progress), delete its file from `.cache/`.
@@ -28,19 +31,24 @@ python scripts/build_data.py   # seconds
 ### Adding a season
 
 1. Add it to `SEASONS` in `scripts/scrape.py` and its tax threshold to `CBT` in `scripts/build_data.py`.
-2. Run both scripts, commit `player-seasons.csv` and `data/`, push.
+2. Run the three scripts, commit `player-seasons.csv` and `public/data/`, push.
 
 The newest season is always held out of training, so it's shown as fully out-of-sample.
 
 ## Running it locally
 
+You need Node 20+.
+
 ```bash
-python -m http.server 8000   # then open http://localhost:8000
+npm install
+npm run dev   # then open http://localhost:5173
 ```
 
 ## Deploying
 
-`.github/workflows/static.yml` publishes the repo root to GitHub Pages on every push to `main`. Turn Pages on under Settings → Pages → Source: GitHub Actions.
+Import the repo on Vercel with the defaults; it detects Vite, runs `npm run build` and serves `dist/`. The CSV and scripts stay out of the deployment.
+
+Player headshots and team logos load from MLB's image servers (`img.mlbstatic.com`, `www.mlbstatic.com`) and belong to MLB; fine for a non-commercial project, but check MLB's terms before using them commercially.
 
 ## Methodology in brief
 

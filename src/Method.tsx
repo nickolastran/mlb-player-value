@@ -50,7 +50,7 @@ export function Method({ db }: { db: Db }) {
         </>)}
       </div>
 
-      <dl className="mt-7 grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-7 gap-y-[18px] border-t border-line pt-[22px]">
+      <dl className="mt-7 grid grid-cols-3 gap-x-7 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1 gap-y-[18px] border-t border-line pt-[22px]">
         <Fact term="Data">
           Season stats, WAR, salaries and service time from{" "}
           <a href="https://www.baseball-reference.com/" rel="noopener" className="underline decoration-line-strong underline-offset-[3px] hover:decoration-bulb">Baseball-Reference</a>,{" "}
@@ -82,7 +82,7 @@ export function Method({ db }: { db: Db }) {
         </Fact>
       </dl>
 
-      <ol className="mt-7 max-w-[80ch] border-t border-line pt-[18px] text-sm text-ink-2">
+      <ol className="mt-7 grid grid-cols-2 gap-x-5 border-t border-line pt-[18px] text-sm text-ink-2 max-[760px]:grid-cols-1">
         <li id="fn-a" className="mb-2.5 flex gap-2.5 target:text-chalk">
           <span className="w-[1ch] flex-none font-bold text-bulb">a</span>
           <span>

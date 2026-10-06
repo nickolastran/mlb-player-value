@@ -174,6 +174,31 @@ const TEAMS: Record<string, [string, string, number]> = {
   WSN: ["Washington Nationals", "#e2465a", 120],
 };
 export const teamName = (code: string) => TEAMS[code]?.[0] ?? code;
+
+// Position filter, in menu order. Options with a `group` sit under that heading.
+const IF = ["1B", "2B", "3B", "SS"], OF = ["LF", "CF", "RF"];
+export const POSITIONS: Record<string, { label: string; has: string[]; group?: string }> = {
+  all: { label: "All positions", has: [] },
+  H: { label: "Batters", has: ["C", ...IF, ...OF, "DH"] },
+  P: { label: "Pitchers", has: ["SP", "RP"] },
+  SP: { label: "Starting pitchers", has: ["SP"], group: "Pitching" },
+  RP: { label: "Relief pitchers", has: ["RP"], group: "Pitching" },
+  IF: { label: "Infielders", has: IF, group: "Infield" },
+  "1B": { label: "First base", has: ["1B"], group: "Infield" },
+  "2B": { label: "Second base", has: ["2B"], group: "Infield" },
+  "3B": { label: "Third base", has: ["3B"], group: "Infield" },
+  SS: { label: "Shortstop", has: ["SS"], group: "Infield" },
+  OF: { label: "Outfielders", has: OF, group: "Outfield" },
+  LF: { label: "Left field", has: ["LF"], group: "Outfield" },
+  CF: { label: "Center field", has: ["CF"], group: "Outfield" },
+  RF: { label: "Right field", has: ["RF"], group: "Outfield" },
+  C: { label: "Catcher", has: ["C"], group: "Other" },
+  DH: { label: "Designated hitter", has: ["DH"], group: "Other" },
+};
+export const inPos = (r: Rec, pos: string) => pos === "all" || POSITIONS[pos].has.includes(r.pos);
+// "New York Yankees, catcher" — whichever filters are on, for titles and notes.
+export const scopeLabel = (team: string, pos: string) =>
+  [team !== "all" && teamName(team), pos !== "all" && POSITIONS[pos].label.toLowerCase()].filter(Boolean).join(", ");
 export const teamColor = (code: string) => TEAMS[code]?.[1] ?? "#7c8894";
 export const teamLogo = (code: string) =>
   TEAMS[code] ? `https://www.mlbstatic.com/team-logos/team-cap-on-dark/${TEAMS[code][2]}.svg` : null;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
-import { loadDb, money, SORTS, teamName, type Db, type ModelId, type SortDir, type SortKey, type Unit } from "./lib";
+import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type SortDir, type SortKey, type Unit } from "./lib";
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
 import { PlayerCard } from "./PlayerCard";
@@ -41,6 +41,7 @@ interface State {
   season: number;
   model: ModelId;
   team: string;
+  pos: string;
   sortKey: SortKey;
   sortDir: SortDir;
   player: string | null;
@@ -71,7 +72,7 @@ function initialState(db: Db): State {
   const s: State = {
     page: location.pathname === PAGES.players || p.get("view") === "players" ? "players" : "home",
     season: defaultSeason(db),
-    model: "market", team: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null,
+    model: "market", team: "all", pos: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null,
   };
   const season = Number(p.get("season"));
   if (db.info(season)) s.season = season;
@@ -79,6 +80,8 @@ function initialState(db: Db): State {
   if (model === "market" || model === "production") s.model = model;
   const team = p.get("team");
   if (team && (team === "all" || db.manifest.teams.includes(team))) s.team = team;
+  const pos = p.get("pos");
+  if (pos && pos in POSITIONS) s.pos = pos;
   const [sk, sd] = (p.get("sort") ?? "").split("-");
   if (sk in SORTS) s.sortKey = sk as SortKey;
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
@@ -96,6 +99,7 @@ function toUrl(db: Db, s: State) {
   if (s.season !== defaultSeason(db)) p.set("season", String(s.season));
   if (s.model !== "market") p.set("model", s.model);
   if (s.team !== "all") p.set("team", s.team);
+  if (s.pos !== "all") p.set("pos", s.pos);
   if (s.sortKey !== "surplus" || s.sortDir !== "desc") p.set("sort", `${s.sortKey}-${s.sortDir}`);
   if (s.player && s.player !== topPlayer(db, s.season, s.model)) p.set("player", s.player);
   if (s.player && s.cardSeason !== cardFor(db, s.player, s.season)) p.set("card", String(s.cardSeason));
@@ -168,6 +172,7 @@ function Explorer({ db }: { db: Db }) {
       season={s.season}
       model={s.model}
       team={s.team}
+      pos={s.pos}
       sortKey={sortKey}
       sortDir={s.sortDir}
       full={full}
@@ -286,6 +291,16 @@ function Explorer({ db }: { db: Db }) {
             <option value="all">All teams</option>
             {teams.map((t) => <option key={t} value={t}>{teamName(t)}</option>)}
           </Select>
+          <div className="max-sm:col-span-2">
+          <Select label="Position" value={s.pos} onChange={(pos) => set({ pos })}>
+            {Object.entries(POSITIONS).filter(([, p]) => !p.group).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+            {[...new Set(Object.values(POSITIONS).map((p) => p.group).filter(Boolean))].map((g) => (
+              <optgroup key={g} label={g}>
+                {Object.entries(POSITIONS).filter(([, p]) => p.group === g).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+              </optgroup>
+            ))}
+          </Select>
+          </div>
         </div>
       </motion.nav>
 
@@ -333,6 +348,7 @@ function Explorer({ db }: { db: Db }) {
             season={s.season}
             model={s.model}
             team={s.team}
+            pos={s.pos}
             picked={picked}
             unit={unit}
             onPicked={setPickedSeasons}
@@ -343,7 +359,7 @@ function Explorer({ db }: { db: Db }) {
 
         <section id="teams" aria-labelledby="teams-title" className={SECTION}>
           <SectionHead id="teams-title" title="Team surplus" />
-          <TeamBars db={db} season={s.season} model={s.model} team={s.team} />
+          <TeamBars db={db} season={s.season} model={s.model} team={s.team} pos={s.pos} />
         </section>
 
         <Method db={db} />

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Config, Data, Layout, PlotMouseEvent } from "plotly.js-dist-min";
 import {
-  C, escapeHtml, FONT, jitter, money, pct, seasonColor, teamColor, teamLogo, teamName,
+  C, escapeHtml, FONT, inPos, POSITIONS, jitter, money, pct, scopeLabel, seasonColor, teamColor, teamLogo, teamName,
   type Db, type ModelId, type Rec, type Unit,
 } from "./lib";
 import { EASE, Segmented } from "./ui";
@@ -116,11 +116,12 @@ function Figure({ title, note, children }: { title?: string; note?: string; chil
 
 type Row = Rec & { season: number };
 
-export function Scatters({ db, season, model, team, picked, unit, onPicked, onUnit, onPick }: {
+export function Scatters({ db, season, model, team, pos, picked, unit, onPicked, onUnit, onPick }: {
   db: Db;
   season: number;
   model: ModelId;
   team: string;
+  pos: string;
   picked: number[];
   unit: Unit;
   onPicked: (s: number[]) => void;
@@ -129,14 +130,15 @@ export function Scatters({ db, season, model, team, picked, unit, onPicked, onUn
 }) {
   const modelInfo = db.model(model);
   const bySeason = picked.length > 1;
-  const teamScope = team === "all" ? "" : ` ${teamName(team)} only.`;
+  const scope = scopeLabel(team, pos);
+  const teamScope = scope ? ` ${scope[0].toUpperCase()}${scope.slice(1)} only.` : "";
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const s of [...picked].sort())
-      for (const r of db.recs(s, model)) if ((team === "all" || r.team === team) && r.salary != null) out.push({ ...r, season: s });
+      for (const r of db.recs(s, model)) if ((team === "all" || r.team === team) && inPos(r, pos) && r.salary != null) out.push({ ...r, season: s });
     return out;
-  }, [db, picked, model, team]);
+  }, [db, picked, model, team, pos]);
 
   const plots = useMemo(() => {
     if (!rows.length) return null;
@@ -213,7 +215,7 @@ export function Scatters({ db, season, model, team, picked, unit, onPicked, onUn
     ? db.hasSalary(season)
       ? "Pick at least one season above to plot."
       : `${db.label(season)} doesn't have actual salaries in the data yet, so there's nothing to compare predictions against. Pick earlier seasons above.`
-    : `No qualifying ${teamName(team)} players in the selected seasons.`;
+    : "No qualifying players match these filters in the selected seasons.";
 
   const toggle = (s: number) => {
     const next = picked.includes(s) ? picked.filter((x) => x !== s) : [...picked, s];
@@ -289,12 +291,13 @@ export function Scatters({ db, season, model, team, picked, unit, onPicked, onUn
 
 // ---------- Team surplus bars ----------
 
-export function TeamBars({ db, season, model, team }: { db: Db; season: number; model: ModelId; team: string }) {
+export function TeamBars({ db, season, model, team, pos }: { db: Db; season: number; model: ModelId; team: string; pos: string }) {
   const reduce = useReducedMotion();
   const modelInfo = db.model(model);
 
   const result = useMemo(() => {
     const transition = reduce ? undefined : { duration: 500, easing: "cubic-in-out" as const };
+    const who = pos === "all" ? "players" : `players (${POSITIONS[pos].label.toLowerCase()})`;
     const barStyle = (values: number[]) => ({ color: values.map((v) => (v >= 0 ? C.under : C.over)), line: { width: 0 } });
 
     if (team === "all") {
@@ -306,7 +309,7 @@ export function TeamBars({ db, season, model, team }: { db: Db; season: number; 
       }
       const sums = new Map<string, { usd: number; pct: number; n: number }>();
       for (const r of db.recs(season, model)) {
-        if (r.salary == null || r.traded) continue;
+        if (r.salary == null || r.traded || !inPos(r, pos)) continue;
         const t = sums.get(r.team) ?? { usd: 0, pct: 0, n: 0 };
         t.usd += r.surplus!; t.pct += r.surplus_pct!; t.n += 1;
         sums.set(r.team, t);
@@ -314,7 +317,7 @@ export function TeamBars({ db, season, model, team }: { db: Db; season: number; 
       const teams = [...sums.entries()].sort((a, b) => b[1].usd - a[1].usd);
       const y = teams.map(([, v]) => v.usd / 1e6);
       return {
-        note: `${modelInfo.label} prediction minus actual salary, summed across each roster's qualifying players in ${db.label(season)}. Blue teams got more production than they paid for. Traded players are left out because their salary can't be split by team.`,
+        note: `${modelInfo.label} prediction minus actual salary, summed across each roster's qualifying ${who} in ${db.label(season)}. Blue teams got more production than they paid for. Traded players are left out because their salary can't be split by team.`,
         data: [{
           type: "bar",
           x: teams.map(([t]) => t),
@@ -343,12 +346,12 @@ export function TeamBars({ db, season, model, team }: { db: Db; season: number; 
 
     // One team across every season with salaries, in % of CBT so seasons compare fairly.
     const vals = db.manifest.seasons.filter((s) => s.has_salary).map((s) => {
-      const rows = db.recs(s.season, model).filter((r) => r.team === team && r.salary != null);
+      const rows = db.recs(s.season, model).filter((r) => r.team === team && inPos(r, pos) && r.salary != null);
       return { s, n: rows.length, usd: rows.reduce((a, r) => a + r.surplus!, 0), pct: rows.reduce((a, r) => a + r.surplus_pct!, 0) };
     });
     const y = vals.map((v) => v.pct * 100);
     return {
-      note: `${teamName(team)}: ${modelInfo.label.toLowerCase()} prediction minus actual salary, summed across qualifying players each season, as a share of that season's tax threshold so the years compare fairly. The outlined bar is the selected season. Traded players are left out.`,
+      note: `${teamName(team)}: ${modelInfo.label.toLowerCase()} prediction minus actual salary, summed across qualifying ${who} each season, as a share of that season's tax threshold so the years compare fairly. The outlined bar is the selected season. Traded players are left out.`,
       data: [{
         type: "bar",
         x: vals.map((v) => v.s.label),
@@ -367,7 +370,7 @@ export function TeamBars({ db, season, model, team }: { db: Db; season: number; 
         transition,
       } as Partial<Layout>),
     };
-  }, [db, season, model, team, modelInfo, reduce]);
+  }, [db, season, model, team, pos, modelInfo, reduce]);
 
   const cls = "h-[440px] w-full max-sm:h-[420px]";
   return (

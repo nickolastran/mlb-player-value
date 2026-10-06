@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "motion/react";
-import { money, SORTS, teamLogo, teamName, type Db, type ModelId, type Rec, type SortDir, type SortKey } from "./lib";
+import { inPos, money, scopeLabel, SORTS, teamLogo, type Db, type ModelId, type Rec, type SortDir, type SortKey } from "./lib";
 import { Headshot, Select, TeamLogo } from "./ui";
 
 const BOARD_ROWS = 12;
@@ -8,11 +8,12 @@ const BOARD_ROWS = 12;
 const dirText = (key: SortKey, dir: SortDir) =>
   key === "player" ? (dir === "asc" ? "A to Z" : "Z to A") : dir === "desc" ? "High to low" : "Low to high";
 
-export function Leaderboard({ db, season, model, team, sortKey, sortDir, full, current, onSort, onShowAll, onPick }: {
+export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, current, onSort, onShowAll, onPick }: {
   db: Db;
   season: number;
   model: ModelId;
   team: string;
+  pos: string;
   sortKey: SortKey; // already the effective sort
   sortDir: SortDir;
   full: boolean; // the all-players page
@@ -24,7 +25,7 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, full, c
   const salary = db.hasSalary(season);
 
   const rows = useMemo(() => {
-    const all = db.recs(season, model).filter((r) => team === "all" || r.team === team);
+    const all = db.recs(season, model).filter((r) => (team === "all" || r.team === team) && inPos(r, pos));
     const get = SORTS[sortKey].get;
     const sign = sortDir === "desc" ? -1 : 1;
     // Missing values (e.g. no salary on record) always sink to the bottom.
@@ -34,7 +35,7 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, full, c
       const c = typeof va === "string" ? va.localeCompare(vb as string) : va - (vb as number);
       return sign * c || b.pred - a.pred;
     });
-  }, [db, season, model, team, sortKey, sortDir]);
+  }, [db, season, model, team, pos, sortKey, sortDir]);
 
   const shown = full ? rows : rows.slice(0, BOARD_ROWS);
   const title = sortKey === "surplus"
@@ -62,7 +63,7 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, full, c
     <div className="rounded-xl border border-line bg-panel pb-2.5 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 pb-3">
         <h3 className="text-[1.0625rem] font-semibold">
-          {title}, {db.label(season)}{team === "all" ? "" : `, ${teamName(team)}`}
+          {[title, db.label(season), scopeLabel(team, pos)].filter(Boolean).join(", ")}
         </h3>
         <div className="flex items-end gap-2">
           <Select small label="Sort by" value={sortKey} onChange={(v) => onSort(v as SortKey, SORTS[v as SortKey].natural)}>

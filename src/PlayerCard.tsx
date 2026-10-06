@@ -46,7 +46,7 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
   const gap = rec.production.pred - rec.market.pred;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-line bg-panel" aria-live="polite">
+    <article className="h-full overflow-hidden rounded-xl border border-line bg-panel" aria-live="polite">
       <div className="relative overflow-hidden border-b border-line py-5 pl-7 pr-5 max-sm:pl-6">
         {/* Team stripe and headshot re-enter whenever the player or team changes */}
         <AnimatePresence initial={false} mode="popLayout">

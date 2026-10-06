@@ -322,7 +322,7 @@ function Explorer({ db }: { db: Db }) {
             note={`Search any hitter with ${db.manifest.min_pa}+ plate appearances or pitcher with ${db.manifest.min_ip}+ innings in a season, or click a dot on the charts below.`}
           />
           <Search db={db} season={s.season} onPick={(id, season) => openPlayer(id, season, false)} />
-          <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-start gap-5 max-[900px]:grid-cols-1">
+          <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-5 max-[900px]:grid-cols-1">
             <div ref={cardRef} className="scroll-mt-24">
               <PlayerCard
                 db={db}

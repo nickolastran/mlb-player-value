@@ -2,7 +2,7 @@
 
 export type ModelId = "market" | "production";
 export type Unit = "usd" | "pct";
-export type SortKey = "surplus" | "pred" | "salary" | "war" | "age" | "player";
+export type SortKey = "surplus" | "pred" | "salary" | "war" | "age";
 export type SortDir = "asc" | "desc";
 
 export interface Rec {
@@ -277,11 +277,10 @@ export function jitter(id: string) {
 // ---------- Leaderboard sorts ----------
 
 // `natural` is the direction a fresh click uses.
-export const SORTS: Record<SortKey, { label: string; natural: SortDir; needsSalary?: boolean; get: (r: Rec) => number | string | null }> = {
+export const SORTS: Record<SortKey, { label: string; natural: SortDir; needsSalary?: boolean; get: (r: Rec) => number | null }> = {
   surplus: { label: "surplus", natural: "desc", needsSalary: true, get: (r) => r.surplus },
   pred: { label: "predicted salary", natural: "desc", get: (r) => r.pred },
   salary: { label: "actual salary", natural: "desc", needsSalary: true, get: (r) => r.salary },
   war: { label: "WAR", natural: "desc", get: (r) => r.war },
   age: { label: "age", natural: "asc", get: (r) => r.age },
-  player: { label: "name", natural: "asc", get: (r) => r.player },
 };

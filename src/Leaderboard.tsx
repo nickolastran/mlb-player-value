@@ -8,17 +8,17 @@ const BOARD_ROWS = 12;
 const dirText = (key: SortKey, dir: SortDir) =>
   key === "player" ? (dir === "asc" ? "A to Z" : "Z to A") : dir === "desc" ? "High to low" : "Low to high";
 
-export function Leaderboard({ db, season, model, team, sortKey, sortDir, showAll, current, onSort, onShowAll, onPick }: {
+export function Leaderboard({ db, season, model, team, sortKey, sortDir, full, current, onSort, onShowAll, onPick }: {
   db: Db;
   season: number;
   model: ModelId;
   team: string;
   sortKey: SortKey; // already the effective sort
   sortDir: SortDir;
-  showAll: boolean;
+  full: boolean; // the all-players page
   current: string | null;
   onSort: (key: SortKey, dir: SortDir) => void;
-  onShowAll: (v: boolean) => void;
+  onShowAll: () => void;
   onPick: (id: string) => void;
 }) {
   const salary = db.hasSalary(season);
@@ -36,7 +36,7 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, showAll
     });
   }, [db, season, model, team, sortKey, sortDir]);
 
-  const shown = showAll ? rows : rows.slice(0, BOARD_ROWS);
+  const shown = full ? rows : rows.slice(0, BOARD_ROWS);
   const title = sortKey === "surplus"
     ? sortDir === "desc" ? "Most underpaid" : "Most overpaid"
     : `By ${SORTS[sortKey].label}, ${dirText(sortKey, sortDir).toLowerCase()}`;
@@ -115,7 +115,7 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, showAll
             {shown.map((r: Rec, i) => (
               <motion.tr
                 key={r.id}
-                layout={showAll ? false : "position"}
+                layout={full ? false : "position"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3, layout: { type: "spring", bounce: 0.1, duration: 0.45 } }}
@@ -150,13 +150,13 @@ export function Leaderboard({ db, season, model, team, sortKey, sortDir, showAll
       <p className="mx-4 mt-2.5 max-w-[60ch] text-[0.8125rem] text-muted">
         Surplus is predicted minus actual salary. Positive means the player is paid less than the model says he's worth. Click a column heading to sort by it.
       </p>
-      {rows.length > BOARD_ROWS && (
+      {!full && rows.length > BOARD_ROWS && (
         <button
           type="button"
-          onClick={() => onShowAll(!showAll)}
+          onClick={onShowAll}
           className="cursor-pointer px-4 pb-1 pt-2.5 text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb"
         >
-          {showAll ? "Show fewer" : `Show all ${rows.length} players`}
+          Show all {rows.length} players →
         </button>
       )}
     </div>

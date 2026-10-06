@@ -37,6 +37,7 @@ export default function App() {
 // ---------- URL hash (shareable state) ----------
 
 interface State {
+  page: "home" | "players";
   season: number;
   model: ModelId;
   team: string;
@@ -46,13 +47,32 @@ interface State {
   cardSeason: number | null;
 }
 
+const PAGES = { home: "/", players: "/players" } as const;
+const TITLE = "MLB Player Value";
+
+const defaultSeason = (db: Db) => db.salarySeasons.at(-1) ?? db.manifest.seasons[db.manifest.seasons.length - 1].season;
+
+// The season's best-value player, so the card is never empty.
+function topPlayer(db: Db, season: number, model: ModelId) {
+  const rows = db.recs(season, model);
+  const paid = rows.filter((r) => r.surplus != null);
+  return (paid.length ? paid.reduce((a, b) => (b.surplus! > a.surplus! ? b : a)) : rows[0])?.id ?? null;
+}
+
+function cardFor(db: Db, id: string, season: number) {
+  const ps = db.players.get(id)!.seasons;
+  return ps.includes(season) ? season : ps[ps.length - 1];
+}
+
+// The URL only carries what differs from the defaults, so a bare "/" is the default dashboard.
 function initialState(db: Db): State {
-  const seasons = db.manifest.seasons;
+  // Older links kept their state in the hash.
+  const p = new URLSearchParams(location.search || location.hash.slice(1));
   const s: State = {
-    season: db.salarySeasons.at(-1) ?? seasons[seasons.length - 1].season,
+    page: location.pathname === PAGES.players || p.get("view") === "players" ? "players" : "home",
+    season: defaultSeason(db),
     model: "market", team: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null,
   };
-  const p = new URLSearchParams(location.hash.slice(1));
   const season = Number(p.get("season"));
   if (db.info(season)) s.season = season;
   const model = p.get("model");
@@ -63,23 +83,24 @@ function initialState(db: Db): State {
   if (sk in SORTS) s.sortKey = sk as SortKey;
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
   const id = p.get("player");
-  if (id && db.players.has(id)) {
-    s.player = id;
+  s.player = id && db.players.has(id) ? id : topPlayer(db, s.season, s.model);
+  if (s.player) {
     const cs = Number(p.get("card"));
-    if (db.players.get(id)!.seasons.includes(cs)) s.cardSeason = cs;
-  }
-  if (!s.player) {
-    // Start on the season's best-value player so the card is never empty.
-    const rows = db.recs(s.season, s.model);
-    const paid = rows.filter((r) => r.surplus != null);
-    const top = paid.length ? paid.reduce((a, b) => (b.surplus! > a.surplus! ? b : a)) : rows[0];
-    if (top) s.player = top.id;
-  }
-  if (s.player && s.cardSeason == null) {
-    const ps = db.players.get(s.player)!.seasons;
-    s.cardSeason = ps.includes(s.season) ? s.season : ps[ps.length - 1];
+    s.cardSeason = db.players.get(s.player)!.seasons.includes(cs) ? cs : cardFor(db, s.player, s.season);
   }
   return s;
+}
+
+function toUrl(db: Db, s: State) {
+  const p = new URLSearchParams();
+  if (s.season !== defaultSeason(db)) p.set("season", String(s.season));
+  if (s.model !== "market") p.set("model", s.model);
+  if (s.team !== "all") p.set("team", s.team);
+  if (s.sortKey !== "surplus" || s.sortDir !== "desc") p.set("sort", `${s.sortKey}-${s.sortDir}`);
+  if (s.player && s.player !== topPlayer(db, s.season, s.model)) p.set("player", s.player);
+  if (s.player && s.cardSeason !== cardFor(db, s.player, s.season)) p.set("card", String(s.cardSeason));
+  const q = p.toString();
+  return PAGES[s.page] + (q ? `?${q}` : "");
 }
 
 // ---------- The page ----------
@@ -87,17 +108,29 @@ function initialState(db: Db): State {
 function Explorer({ db }: { db: Db }) {
   const [s, setS] = useState(() => initialState(db));
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
-  const [showAll, setShowAll] = useState(false);
   const [picked, setPicked] = useState<number[]>(() => (db.hasSalary(s.season) ? [s.season] : []));
   const [unit, setUnit] = useState<Unit>("usd");
   const cardRef = useRef<HTMLDivElement>(null);
+  const scrollToCard = useRef(false);
 
   useEffect(() => {
-    const p = new URLSearchParams({ season: String(s.season), model: s.model, team: s.team });
-    if (s.sortKey !== "surplus" || s.sortDir !== "desc") p.set("sort", `${s.sortKey}-${s.sortDir}`);
-    if (s.player) { p.set("player", s.player); p.set("card", String(s.cardSeason)); }
-    history.replaceState(null, "", `#${p}`);
-  }, [s]);
+    // Switching pages gets a history entry so the back button works; everything else just updates the URL.
+    history[location.pathname === PAGES[s.page] ? "replaceState" : "pushState"](null, "", toUrl(db, s));
+    document.title = s.page === "players" ? `All players · ${TITLE}` : TITLE;
+  }, [db, s]);
+
+  useEffect(() => {
+    const onPop = () => setS(initialState(db));
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, [db]);
+
+  // A new page starts at the top, unless we came here to open a player's card.
+  useEffect(() => {
+    if (scrollToCard.current) cardRef.current?.scrollIntoView({ block: "start" });
+    else window.scrollTo(0, 0);
+    scrollToCard.current = false;
+  }, [s.page]);
 
   // Salary-based sorts fall back to predicted salary for a season without salaries,
   // without forgetting the user's choice.
@@ -110,14 +143,15 @@ function Explorer({ db }: { db: Db }) {
   const setSeason = (season: number) => {
     const ps = s.player ? db.players.get(s.player)!.seasons : [];
     set({ season, ...(ps.includes(season) ? { cardSeason: season } : {}) });
-    setShowAll(false);
     setPickedSeasons(db.hasSalary(season) ? [season] : []);
   };
   const openPlayer = (id: string, season: number, scroll: boolean) => {
     const ps = db.players.get(id)?.seasons;
     if (!ps) return;
-    set({ player: id, cardSeason: ps.includes(season) ? season : ps[ps.length - 1] });
-    if (scroll) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    set({ page: "home", player: id, cardSeason: ps.includes(season) ? season : ps[ps.length - 1] });
+    if (!scroll) return;
+    if (s.page === "home") cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    else scrollToCard.current = true;
   };
 
   const seasons = db.manifest.seasons;
@@ -128,6 +162,21 @@ function Explorer({ db }: { db: Db }) {
   const paid = db.recs(s.season, s.model).filter((r) => r.surplus != null);
   const best = paid.length ? paid.reduce((a, b) => (b.surplus! > a.surplus! ? b : a)) : null;
   const worst = paid.length ? paid.reduce((a, b) => (b.surplus! < a.surplus! ? b : a)) : null;
+  const board = (full: boolean) => (
+    <Leaderboard
+      db={db}
+      season={s.season}
+      model={s.model}
+      team={s.team}
+      sortKey={sortKey}
+      sortDir={s.sortDir}
+      full={full}
+      current={s.player}
+      onSort={(k, d) => set({ sortKey: k, sortDir: d })}
+      onShowAll={() => set({ page: "players" })}
+      onPick={(id) => openPlayer(id, s.season, true)}
+    />
+  );
   const rise = {
     hidden: { opacity: 0, y: 14 },
     show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
@@ -135,7 +184,27 @@ function Explorer({ db }: { db: Db }) {
 
   return (
     <>
-      {/* The one orchestrated moment: the headline rises line by line, then the rest settles in. */}
+      {s.page === "players" ? (
+        <header className={`${WRAP} pb-[clamp(24px,3vw,36px)] pt-[clamp(32px,5vw,56px)]`}>
+          <nav aria-label="Breadcrumb">
+            <ol className="flex items-center gap-2 text-[0.9375rem] text-muted">
+              <li>
+                <a
+                  href={toUrl(db, { ...s, page: "home" })}
+                  onClick={(e) => { if (e.button || e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); set({ page: "home" }); }}
+                  className="text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb"
+                >
+                  Dashboard
+                </a>
+              </li>
+              <li aria-hidden>/</li>
+              <li aria-current="page" className="text-chalk">All players</li>
+            </ol>
+          </nav>
+          <h1 className="mt-4 text-[clamp(2.5rem,5.2vw,4.5rem)] font-extrabold uppercase leading-[0.95] tracking-[-0.02em]">All players</h1>
+        </header>
+      ) : (
+      /* The one orchestrated moment: the headline rises line by line, then the rest settles in. */
       <motion.header
         className={`${WRAP} grid items-end gap-x-12 gap-y-8 pb-[clamp(24px,3vw,36px)] pt-[clamp(32px,5vw,56px)] ${best && worst ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)]" : ""}`}
         initial="hidden"
@@ -189,6 +258,7 @@ function Explorer({ db }: { db: Db }) {
           </motion.div>
         )}
       </motion.header>
+      )}
 
       <motion.nav
         aria-label="Filters for the whole page"
@@ -212,13 +282,16 @@ function Explorer({ db }: { db: Db }) {
               options={[{ value: "market", label: "Market value" }, { value: "production", label: "Production value" }]}
             />
           </div>
-          <Select label="Team" value={s.team} onChange={(team) => { set({ team }); setShowAll(false); }}>
+          <Select label="Team" value={s.team} onChange={(team) => set({ team })}>
             <option value="all">All teams</option>
             {teams.map((t) => <option key={t} value={t}>{teamName(t)}</option>)}
           </Select>
         </div>
       </motion.nav>
 
+      {s.page === "players" ? (
+        <main className={`${WRAP} pt-[clamp(24px,3vw,36px)]`}>{board(true)}</main>
+      ) : (
       <main>
         <motion.section
           id="lookup"
@@ -245,19 +318,7 @@ function Explorer({ db }: { db: Db }) {
                 onCardSeason={(cardSeason) => set({ cardSeason })}
               />
             </div>
-            <Leaderboard
-              db={db}
-              season={s.season}
-              model={s.model}
-              team={s.team}
-              sortKey={sortKey}
-              sortDir={s.sortDir}
-              showAll={showAll}
-              current={s.player}
-              onSort={(k, d) => { set({ sortKey: k, sortDir: d }); setShowAll(false); }}
-              onShowAll={setShowAll}
-              onPick={(id) => openPlayer(id, s.season, true)}
-            />
+            {board(false)}
           </div>
         </motion.section>
 
@@ -287,6 +348,7 @@ function Explorer({ db }: { db: Db }) {
 
         <Method db={db} />
       </main>
+      )}
 
       <Footer db={db} />
     </>

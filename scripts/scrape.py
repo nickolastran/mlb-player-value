@@ -163,6 +163,25 @@ def salaries(pid: str, played_for: dict[int, str]) -> tuple[dict[int, tuple[floa
     return out, "Drafted by" in page
 
 
+def contract(pid: str) -> tuple[int | None, str | None]:
+    """(free-agency year, option type) from the page's current contract status.
+
+    Baseball-Reference's free-agency year ignores options, so an option covering
+    that year ("& 27 team option") is returned alongside it.
+    """
+    page = fetch(f"/players/{pid[0]}/{pid}.shtml")
+    i = page.find("Contract Status")
+    if i < 0:
+        return None, None
+    text = html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page[i:i + 1500])))
+    fa = re.search(r"Free Agent : (\d{4})", text)
+    if not fa:
+        return None, None
+    year = int(fa.group(1))
+    opts = re.findall(r"& (\d\d)(?:-\d\d)? (team|player|mutual) option", text)
+    return year, next((kind for yy, kind in opts if 2000 + int(yy) == year), None)
+
+
 def fill_gap(pay: dict, drafted: bool, season: int) -> tuple[float | None, float | None, bool]:
     """(salary, service, estimated) for a season, filling the pre-arbitration
     years Baseball-Reference often skips.
@@ -260,6 +279,7 @@ def main() -> None:
         r["Salary"], r["Service"], r["Salary_est"] = fill_gap(*pay[r["bref_id"]], r["Season"])
         if r["Service"] is not None:
             r["Service"] = round(r["Service"], 3)
+        r["FA"], r["FA_option"] = contract(r["bref_id"])  # current status, the same on every row
 
     with OUT.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

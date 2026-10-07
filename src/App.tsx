@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
-import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type SortDir, type SortKey, type Unit } from "./lib";
+import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type Rec, type SortDir, type SortKey, type Unit } from "./lib";
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
 import { PlayerCard } from "./PlayerCard";
@@ -114,6 +114,8 @@ function Explorer({ db }: { db: Db }) {
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
   const [picked, setPicked] = useState<number[]>(() => (db.hasSalary(s.season) ? [s.season] : []));
   const [unit, setUnit] = useState<Unit>("usd");
+  const [faSort, setFaSort] = useState<[SortKey, SortDir]>(["pred", "desc"]);
+  const [faAll, setFaAll] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const scrollToCard = useRef(false);
 
@@ -182,6 +184,10 @@ function Explorer({ db }: { db: Db }) {
       onPick={(id) => openPlayer(id, s.season, true)}
     />
   );
+  // Contract status only exists for the newest season, so this section only shows there.
+  const faYear = s.season + 1;
+  const isFa = (r: Rec) => r.fa === faYear;
+  const hasFa = db.recs(s.season, s.model).some(isFa);
   const rise = {
     hidden: { opacity: 0, y: 14 },
     show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
@@ -336,6 +342,33 @@ function Explorer({ db }: { db: Db }) {
             {board(false)}
           </div>
         </motion.section>
+
+        {hasFa && (
+          <section id="free-agents" aria-labelledby="fa-title" className={SECTION}>
+            <SectionHead
+              id="fa-title"
+              title="Free-agent watch"
+              note={`Players whose contracts run out after ${db.label(s.season)}, per Baseball-Reference. Predicted is what the model says this season was worth, a rough guide to the next contract. An option for ${faYear} can keep a player off the market.`}
+            />
+            <Leaderboard
+              db={db}
+              season={s.season}
+              model={s.model}
+              team={s.team}
+              pos={s.pos}
+              sortKey={faSort[0]}
+              sortDir={faSort[1]}
+              full={faAll}
+              current={s.player}
+              onSort={(k, d) => setFaSort([k, d])}
+              onShowAll={() => setFaAll(true)}
+              onPick={(id) => openPlayer(id, s.season, true)}
+              only={isFa}
+              title={`Free agents after ${db.label(s.season)}`}
+              tag={(r) => r.fa_option && `${r.fa_option} option`}
+            />
+          </section>
+        )}
 
         <section id="charts" aria-labelledby="charts-title" className={SECTION}>
           <SectionHead

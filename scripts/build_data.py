@@ -128,6 +128,9 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
         else:
             rec.update(ip=num(r["IP"], 1), gs=num(r["GS"]), sv=num(r["SV"]), era=num(r["ERA"], 2),
                        era_plus=num(r["ERA_plus"]), so=num(r["SO"]), whip=num(r["WHIP"], 2))
+        # Contract status is as of the scrape, so it only describes the newest season.
+        if season == df["Season"].max() and pd.notna(r.get("FA")):
+            rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None)
         out.append(rec)
     return out
 

@@ -7,7 +7,7 @@ const BOARD_ROWS = 17;
 
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
 
-export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, current, onSort, onShowAll, onPick }: {
+export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, current, onSort, onShowAll, onPick, only, title: heading, tag }: {
   db: Db;
   season: number;
   model: ModelId;
@@ -20,11 +20,14 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
   onSort: (key: SortKey, dir: SortDir) => void;
   onShowAll: () => void;
   onPick: (id: string) => void;
+  only?: (r: Rec) => boolean; // a subset of the season, e.g. free agents
+  title?: string; // replaces the sort-based title
+  tag?: (r: Rec) => string | null | undefined; // a note beside the name
 }) {
   const salary = db.hasSalary(season);
 
   const rows = useMemo(() => {
-    const all = db.recs(season, model).filter((r) => (team === "all" || r.team === team) && inPos(r, pos));
+    const all = db.recs(season, model).filter((r) => (team === "all" || r.team === team) && inPos(r, pos) && (!only || only(r)));
     const get = SORTS[sortKey].get;
     const sign = sortDir === "desc" ? -1 : 1;
     // Missing values (e.g. no salary on record) always sink to the bottom.
@@ -33,7 +36,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
       if (va == null || vb == null) return Number(va == null) - Number(vb == null);
       return sign * (va - vb) || b.pred - a.pred;
     });
-  }, [db, season, model, team, pos, sortKey, sortDir]);
+  }, [db, season, model, team, pos, sortKey, sortDir, only]);
 
   const shown = full ? rows : rows.slice(0, BOARD_ROWS);
   const title = sortKey === "surplus"
@@ -56,15 +59,18 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
   ];
   const visible = cols.filter((c) => salary || !c.salaryCol);
   // No sideways scrolling: the player column takes what's left and long names truncate (wrap on phones,
-  // which also drop age, WAR, predicted and team logos; surplus and salary still imply the prediction).
-  const width = (label: string) => (label === "Player" ? "w-full max-w-0" : ["Age", "WAR", "Predicted"].includes(label) ? "max-sm:hidden" : "");
+  // which also drop age, WAR, predicted and team logos; any two of salary, predicted and surplus imply the third).
+  // The sorted column always stays; salary makes room for it.
+  const sorted = cols.find((c) => c.key === sortKey)?.label;
+  const mobileHidden = ["Age", "WAR", "Predicted"].map((l) => (l === sorted ? "Salary" : l));
+  const width = (label: string) => (label === "Player" ? "w-full max-w-0" : mobileHidden.includes(label) ? "max-sm:hidden" : "");
   const cell = "px-2 first:pl-4 last:pr-4 whitespace-nowrap";
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-line bg-panel pb-2.5 pt-4">
       <div className="flex items-center gap-2.5 px-4 pb-3 max-sm:flex-wrap">
         <h3 className="min-w-0 flex-1 text-[1.0625rem] font-semibold">
-          {[title, db.label(season), scopeLabel(team, pos)].filter(Boolean).join(", ")}
+          {[heading ?? `${title}, ${db.label(season)}`, scopeLabel(team, pos)].filter(Boolean).join(", ")}
         </h3>
         <div className="flex flex-none items-end gap-2 max-sm:w-full max-sm:[&>label]:flex-1">
           <Select small label="Sort by" value={sortKey} onChange={(v) => onSort(v as SortKey, SORTS[v as SortKey].natural)}>
@@ -130,13 +136,16 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
                 <td className={`${cell} ${width("Player")} py-1.5 ${r.id === current ? "font-semibold text-bulb" : ""}`}>
                   <span className="flex items-center gap-2.5 [&>*]:flex-none">
                     <Headshot key={r.id} db={db} id={r.id} size={30} />
-                    <span title={r.player} className="min-w-0 flex-initial! whitespace-normal sm:truncate">{r.player}</span>
+                    <span title={r.player} className="min-w-0 flex-initial! whitespace-normal sm:truncate">
+                      {r.player}
+                      {tag?.(r) && <span className="ml-1.5 inline-block whitespace-nowrap rounded border border-line-strong px-1.5 text-xs font-normal text-muted">{tag(r)}</span>}
+                    </span>
                     <span className="max-sm:hidden">{teamLogo(r.team) ? <TeamLogo key={r.team} code={r.team} size={18} /> : <span className="text-sm text-muted">{r.team}</span>}</span>
                   </span>
                 </td>
                 <td className={`${cell} ${width("Age")} py-1.5 text-right tabular-nums`}>{r.age}</td>
                 <td className={`${cell} ${width("WAR")} py-1.5 text-right tabular-nums`}>{r.war.toFixed(1)}</td>
-                {salary && <td className={`${cell} py-1.5 text-right tabular-nums`}>{r.salary_est ? "≈" : ""}{money(r.salary)}</td>}
+                {salary && <td className={`${cell} ${width("Salary")} py-1.5 text-right tabular-nums`}>{r.salary_est ? "≈" : ""}{money(r.salary)}</td>}
                 <td className={`${cell} ${width("Predicted")} py-1.5 text-right tabular-nums`}>{money(r.pred)}</td>
                 {salary && (
                   <td className={`${cell} py-1.5 text-right tabular-nums ${r.surplus == null ? "" : r.surplus >= 0 ? "text-under" : "text-over"}`}>

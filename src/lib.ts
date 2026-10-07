@@ -27,6 +27,9 @@ export interface Rec {
   surplus_rank: number | null;
   pred_rank: number;
   split: "train" | "test" | "projection";
+  // Contract status as of the scrape, newest season only
+  fa?: number | null; // first free-agent season
+  fa_option?: "team" | "player" | "mutual" | null; // an option covering that season
   // Hitters
   pa?: number;
   hr?: number;

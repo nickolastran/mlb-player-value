@@ -4,12 +4,13 @@ import { inPos, money, scopeLabel, SORTS, teamLogo, type Db, type ModelId, type 
 import { Headshot, Select, TeamLogo } from "./ui";
 
 const BOARD_ROWS = 17;
+const FILL_ROWS = 50; // ponytail: enough for the tallest card; the rest clip under the fade
 
 const link = "cursor-pointer text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb";
 
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
 
-export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, current, onSort, onShowAll, onPick, only, title: heading, tag }: {
+export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, fill, current, onSort, onShowAll, onPick, only, title: heading, tag }: {
   db: Db;
   season: number;
   model: ModelId;
@@ -18,6 +19,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
   sortKey: SortKey; // already the effective sort
   sortDir: SortDir;
   full: boolean; // the all-players page
+  fill?: boolean; // fill the parent's height, clipping rows that don't fit
   current: string | null;
   onSort: (key: SortKey, dir: SortDir) => void;
   onShowAll: () => void;
@@ -40,7 +42,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
     });
   }, [db, season, model, team, pos, sortKey, sortDir, only]);
 
-  const shown = full ? rows : rows.slice(0, BOARD_ROWS);
+  const shown = full ? rows : rows.slice(0, fill ? FILL_ROWS : BOARD_ROWS);
   const title = sortKey === "surplus"
     ? sortDir === "desc" ? "Most underpaid" : "Most overpaid"
     : `By ${SORTS[sortKey].label}, ${dirText(sortDir).toLowerCase()}`;
@@ -112,7 +114,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
         </div>
       </div>
 
-      <div>
+      <div className={fill ? "min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,black_calc(100%-48px),transparent)]" : ""}>
         <table className="w-full border-collapse text-[0.9375rem]">
           <thead>
             <tr>

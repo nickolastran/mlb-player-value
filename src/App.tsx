@@ -178,7 +178,7 @@ function Explorer({ db }: { db: Db }) {
   const paid = db.recs(s.season, s.model).filter((r) => r.surplus != null);
   const best = paid.length ? paid.reduce((a, b) => (b.surplus! > a.surplus! ? b : a)) : null;
   const worst = paid.length ? paid.reduce((a, b) => (b.surplus! < a.surplus! ? b : a)) : null;
-  const board = (full: boolean) => (
+  const board = (full: boolean, fill = false) => (
     <Leaderboard
       db={db}
       season={s.season}
@@ -188,6 +188,7 @@ function Explorer({ db }: { db: Db }) {
       sortKey={sortKey}
       sortDir={s.sortDir}
       full={full}
+      fill={fill}
       current={s.player}
       onSort={(k, d) => set({ sortKey: k, sortDir: d })}
       onShowAll={() => set({ page: "players" })}
@@ -379,7 +380,13 @@ function Explorer({ db }: { db: Db }) {
                   onCardSeason={(vsSeason) => set({ vsSeason })}
                 />
               </div>
-            ) : board(false)}
+            ) : (
+              // The card alone sets the row height; the table shows as many rows as fit beside it.
+              // Stacked on phones there's nothing to match, so it's back to the usual 17 rows.
+              <div className="relative min-h-[36rem] max-[900px]:min-h-0 max-[900px]:[&_tbody_tr:nth-child(n+18)]:hidden">
+                <div className="absolute inset-0 max-[900px]:static">{board(false, true)}</div>
+              </div>
+            )}
           </div>
           {comparing && <div className="mt-5">{board(false)}</div>}
         </motion.section>

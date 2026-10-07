@@ -214,11 +214,54 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               : "The market model values him above his on-field production alone, usually because free agents with six-plus years of service get paid for past performance."}
           </p>
         </div>
+        {base.comps && base.comps.length > 0 && <Comps db={db} comps={base.comps} cardSeason={cardSeason} />}
         {player.seasons.length > 1 && (
           <Career key={player.id} db={db} id={player.id} seasons={player.seasons} cardSeason={cardSeason} model={model} onCardSeason={onCardSeason} />
         )}
       </div>
     </article>
+  );
+}
+
+// What the closest stat lines from other seasons were actually paid.
+function Comps({ db, comps, cardSeason }: { db: Db; comps: [string, number][]; cardSeason: number }) {
+  const rows = comps.map(([id, s]) => db.find(s, "market", id)!);
+  // Median share of that season's tax threshold, scaled to this season's, so old salaries compare fairly.
+  const shares = rows.map((r) => r.salary_pct!).sort((a, b) => a - b);
+  const mid = shares.length >> 1;
+  const median = (shares.length % 2 ? shares[mid] : (shares[mid - 1] + shares[mid]) / 2) * db.info(cardSeason)!.cap;
+
+  return (
+    <section aria-label="Comparable players" className="mt-3.5 rounded-lg border border-line px-3.5 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h4 className="font-semibold">Players like him were paid</h4>
+        <span className="text-sm text-ink-2">
+          median <span className="text-lg font-bold tabular-nums text-chalk">{usd(median)}</span>
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-ink-2">
+        The closest stat lines and ages from other players' seasons. The median is scaled to the {db.label(cardSeason)} tax threshold.
+      </p>
+      <ul className="mt-2">
+        {rows.map((r, i) => {
+          const s = comps[i][1];
+          const stat = r.role === "H" ? `${r.ops_plus} OPS+` : `${r.era?.toFixed(2)} ERA`;
+          return (
+            <li key={r.id} className="flex items-center gap-3 border-t border-line py-2 first:border-0">
+              <Headshot db={db} id={r.id} size={34} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{r.player}</span>
+                <span className="flex items-center gap-1.5 text-xs text-muted tabular-nums">
+                  <TeamLogo code={r.team} size={14} />
+                  {db.label(s)}, age {r.age}, {r.war.toFixed(1)} WAR, {stat}
+                </span>
+              </span>
+              <span className="flex-none font-semibold tabular-nums">{usd(r.salary!)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

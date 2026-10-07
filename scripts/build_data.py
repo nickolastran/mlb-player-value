@@ -16,6 +16,9 @@ salary as a share of that season's luxury-tax (CBT) threshold:
 Seasons before the latest are split 80/20 into train/test. The latest season
 is never trained on, so it's fully out-of-sample.
 
+Comparables: each player-season's nearest neighbours on the model stats plus age
+(standardised), among other players in other seasons with a listed salary.
+
 Output:
     public/data/<season>-<model>.json   one file per season and model
     public/data/seasons.json          seasons, models, thresholds and teams
@@ -33,6 +36,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "player-seasons.csv"
@@ -64,6 +69,7 @@ MODELS = {
                    "description": "Stats only. Closer to pure on-field worth."},
 }
 MIN_PA, MIN_IP = 300, 50
+N_COMPS = 5
 
 
 def num(value, digits: int | None = None):
@@ -98,6 +104,29 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     return df, r2
 
 
+def comps(df: pd.DataFrame) -> pd.Series:
+    """[[bref_id, season], ...] per row: the most similar seasons by other players in other seasons with a listed salary."""
+    out = {}
+    for role, cols in FEATURES.items():
+        rows = df[df["Role"] == role]
+        X = StandardScaler().fit_transform(rows[cols + ["Age"]])
+        pool = (rows["Salary"].notna() & ~rows["Salary_est"]).to_numpy()
+        ids, seasons = rows["bref_id"].to_numpy()[pool], rows["Season"].to_numpy()[pool]
+        # Ask for extra neighbours: the same season, the player himself and repeat players get skipped.
+        _, near = NearestNeighbors(n_neighbors=60).fit(X[pool]).kneighbors(X)
+        for i, (me, season) in zip(rows.index, rows[["bref_id", "Season"]].to_numpy()):
+            seen, picked = {me}, []
+            for j in near[rows.index.get_loc(i)]:
+                if ids[j] in seen or seasons[j] == season:
+                    continue
+                seen.add(ids[j])
+                picked.append([ids[j], int(seasons[j])])
+                if len(picked) == N_COMPS:
+                    break
+            out[i] = picked
+    return pd.Series(out)
+
+
 def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
     cbt = CBT[season]
     rows = df[df["Season"] == season].copy()
@@ -128,6 +157,9 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
         else:
             rec.update(ip=num(r["IP"], 1), gs=num(r["GS"]), sv=num(r["SV"]), era=num(r["ERA"], 2),
                        era_plus=num(r["ERA_plus"]), so=num(r["SO"]), whip=num(r["WHIP"], 2))
+        # Comparables don't depend on the model, so only the market file carries them.
+        if model == "market":
+            rec["comps"] = r["comps"]
         # Contract status is as of the scrape, so it only describes the newest season.
         if season == df["Season"].max() and pd.notna(r.get("FA")):
             rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None)
@@ -149,6 +181,8 @@ def main() -> None:
 
     df, r2 = train(df)
     print(f"Test R²: {r2}")
+    df["comps"] = comps(df)
+    assert df["comps"].map(len).ge(3).all(), "a player-season has fewer than 3 comparables; raise n_neighbors in comps()"
 
     DATA_DIR.mkdir(exist_ok=True)
     for old in DATA_DIR.glob("[0-9]*-*.json"):  # season files only; mlbam.json is player_ids.py's

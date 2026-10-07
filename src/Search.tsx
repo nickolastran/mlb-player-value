@@ -70,7 +70,7 @@ export function Search({ db, season, onPick, placeholder = "Search a player, e.g
           else if (e.key === "Enter") { e.preventDefault(); choose(active); }
           else if (e.key === "Escape") setOpen(false);
         }}
-        className="h-12 w-full rounded-xl border border-line-strong bg-panel pl-11 pr-4 text-[1.0625rem] text-chalk placeholder:text-muted transition-colors hover:border-ink-2 focus:border-bulb focus:outline-none"
+        className="h-12 w-full rounded-xl border border-line-strong bg-panel pl-11 pr-4 text-[1.0625rem] text-chalk placeholder:text-muted transition-colors hover:border-ink-2 focus:border-chalk focus:outline-none"
       />
       <AnimatePresence>
         {shown && (
@@ -82,7 +82,7 @@ export function Search({ db, season, onPick, placeholder = "Search a player, e.g
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12 } }}
             transition={{ duration: 0.18 }}
-            className="absolute inset-x-0 top-[calc(100%+6px)] z-30 max-h-[360px] origin-top overflow-y-auto rounded-xl border border-line-strong bg-panel-2 p-1.5 shadow-[0_18px_44px_rgba(3,8,15,0.55)]"
+            className="absolute inset-x-0 top-[calc(100%+6px)] z-30 max-h-[360px] origin-top overflow-y-auto rounded-xl border border-line-strong bg-panel-2 p-1.5 shadow-[0_12px_32px_rgba(22,36,27,0.16)]"
           >
             {matches.length === 0 && (
               <li className="px-3 py-2.5 text-ink-2">

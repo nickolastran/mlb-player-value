@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
-/* Night game: deep road-navy surfaces, chalk ink, scoreboard-bulb amber for the active selection only. */
+/* Payroll ledger: eye-ease green ledger paper, green-black ink, blue and red ink for the money,
+   and a yellow highlighter for whatever is selected. The highlighter is only ever a fill, never text. */
 @theme {
-  --color-night: #0c1a2b;
-  --color-panel: #11233a;
-  --color-panel-2: #17304d;
-  --color-line: #1f3a5c;
-  --color-line-strong: #2d4d74;
-  --color-chalk: #eef2f7;
-  --color-ink-2: #a9b8ca;
-  --color-muted: #7f93ab;
-  --color-bulb: #f5b83d;
-  --color-bulb-ink: #1d1404;
-  /* Diverging pair, validated against panel: blue = underpaid, red = overpaid */
-  --color-under: #3987e5;
-  --color-over: #e66767;
+  --color-night: #e5ecdd; /* the paper */
+  --color-panel: #f5f8f0;
+  --color-panel-2: #dde6d3;
+  --color-line: #cad7bf;
+  --color-line-strong: #a3b798;
+  --color-chalk: #16241b; /* ink */
+  --color-ink-2: #3e4f44;
+  --color-muted: #56665b;
+  --color-bulb: #f5dd3b; /* highlighter */
+  --color-bulb-ink: #16241b;
+  /* Diverging pair, validated against panel: blue ink = underpaid, red ink = overpaid */
+  --color-under: #1f5fbf;
+  --color-over: #bb3027;
   --font-sans: "Libre Franklin", "Franklin Gothic", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 html { scroll-behavior: smooth; scroll-padding-top: 96px; }
 body { @apply bg-night text-chalk antialiased; }
-:focus-visible { outline: 2px solid var(--color-bulb); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--color-chalk); outline-offset: 2px; }
 ::selection { background: var(--color-bulb); color: var(--color-bulb-ink); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -30,8 +31,8 @@ body { @apply bg-night text-chalk antialiased; }
   html { scroll-padding-top: 12px; }
 }
 
-/* Plotly modebar on dark */
+/* Plotly modebar */
 .js-plotly-plot .plotly .modebar { background: transparent !important; }
 .js-plotly-plot .plotly .modebar-btn path { fill: var(--color-muted) !important; }
 .js-plotly-plot .plotly .modebar-btn:hover path,
-.js-plotly-plot .plotly .modebar-btn.active path { fill: var(--color-bulb) !important; }
+.js-plotly-plot .plotly .modebar-btn.active path { fill: var(--color-chalk) !important; }

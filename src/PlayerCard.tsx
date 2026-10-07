@@ -175,9 +175,9 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               <section
                 key={m.id}
                 aria-label={`${m.label} model`}
-                className={`relative rounded-lg border px-3.5 py-3 transition-colors duration-300 ${on ? "border-bulb bg-bulb/[0.06]" : "border-line"}`}
+                className={`relative rounded-lg border px-3.5 py-3 transition-colors duration-300 ${on ? "border-line-strong bg-bulb/35" : "border-line"}`}
               >
-                <h4 className={`text-sm font-semibold transition-colors duration-300 ${on ? "text-bulb" : "text-ink-2"}`}>{m.label} predicts</h4>
+                <h4 className={`text-sm font-semibold transition-colors duration-300 ${on ? "text-chalk" : "text-ink-2"}`}>{m.label} predicts</h4>
                 <Tween value={r.pred} format={usd} className="mt-1.5 block text-[1.625rem] font-bold leading-[1.1] tabular-nums" />
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5 text-sm [&_dd]:whitespace-nowrap">
                   <dt className="text-muted">Share of CBT</dt>
@@ -343,7 +343,7 @@ function Career({ db, id, seasons, cardSeason, model, onCardSeason }: {
             width={colW}
             height={H - T - B + 6}
             fill={p.s === cardSeason ? C.accent : p.s === hover ? C.panel2 : "transparent"}
-            fillOpacity={p.s === cardSeason ? 0.12 : 1}
+            fillOpacity={p.s === cardSeason ? 0.5 : 1}
           />
         ))}
         <path d={path((r) => r.pred)} fill="none" stroke={C.text2} strokeWidth={2} strokeDasharray="5 4" />

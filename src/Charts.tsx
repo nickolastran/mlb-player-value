@@ -171,7 +171,7 @@ export function Scatters({ db, season, model, team, pos, picked, unit, onPicked,
     const fmtTick = usd ? { tickformat: "$,~f", ticksuffix: "M" } : { tickformat: ",~f", ticksuffix: "%" };
     // Many seasons at once means thousands of dots: shrink them so the overlap stays readable.
     const many = picked.length > 3;
-    const marker = (color: string) => ({ color, size: many ? 7 : 9, opacity: many ? 0.8 : 0.9, line: { color: C.panel, width: many ? 1 : 1.5 } });
+    const marker = (color: string) => ({ color, size: many ? 7 : 9, opacity: many ? 0.8 : 0.9, line: { color: "rgba(22,36,27,0.45)", width: 1 } }); // ink edge keeps pale team colors visible on the paper
     const points = (g: (typeof gs)[number], x: (r: Row) => number, y: (r: Row) => number): Data => ({
       type: "scatter",
       mode: "markers",
@@ -222,7 +222,7 @@ export function Scatters({ db, season, model, team, pos, picked, unit, onPicked,
     onPicked(next);
   };
   const colorNote = bySeason
-    ? "Colored by season, lighter is more recent."
+    ? "Colored by season, darker is more recent."
     : "Colored by team. Click a legend entry to hide it, double-click to show only that one.";
   const plotCls = "h-[520px] w-full max-sm:h-[560px]";
 
@@ -238,7 +238,7 @@ export function Scatters({ db, season, model, team, pos, picked, unit, onPicked,
                 <label
                   key={s.season}
                   title={s.has_salary ? undefined : "No salaries for this season yet"}
-                  className={`relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-bulb ${on ? "border-ink-2 bg-panel-2 text-chalk" : "border-line-strong text-ink-2"} ${s.has_salary ? "cursor-pointer hover:text-chalk" : "opacity-45"}`}
+                  className={`relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-chalk ${on ? "border-ink-2 bg-panel-2 text-chalk" : "border-line-strong text-ink-2"} ${s.has_salary ? "cursor-pointer hover:text-chalk" : "opacity-45"}`}
                 >
                   <input type="checkbox" className="sr-only" checked={on} disabled={!s.has_salary} onChange={() => toggle(s.season)} />
                   <AnimatePresence initial={false}>
@@ -356,7 +356,7 @@ export function TeamBars({ db, season, model, team, pos }: { db: Db; season: num
         type: "bar",
         x: vals.map((v) => v.s.label),
         y,
-        marker: { ...barStyle(y), line: { color: vals.map((v) => (v.s.season === season ? C.accent : "rgba(0,0,0,0)")), width: 2 } },
+        marker: { ...barStyle(y), line: { color: vals.map((v) => (v.s.season === season ? C.text : "rgba(0,0,0,0)")), width: 2 } },
         text: vals.map((v) => `<b>${escapeHtml(teamName(team))}, ${v.s.label}</b><br>Surplus <b>${pct(v.pct, true)}</b> of CBT (${money(v.usd, true)})<br>${v.n} qualifying players`),
         hovertemplate: "%{text}<extra></extra>",
         textposition: "none",
@@ -406,7 +406,7 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
 
   const plot = useMemo(() => {
     const color = (t: string) =>
-      team !== "all" ? (t === team ? C.accent : null) : best.has(t) ? C.under : worst.has(t) ? C.over : null;
+      team !== "all" ? (t === team ? C.text : null) : best.has(t) ? C.under : worst.has(t) ? C.over : null;
     const x = seasons.map((s) => s.label);
     // Grey lines first so the colored ones draw on top.
     const ordered = [...lines].sort((a, b) => Number(color(a.team) != null) - Number(color(b.team) != null));
@@ -439,7 +439,7 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
         xaxis: axis("", { showgrid: false, type: "category" }),
         yaxis: axis("Total surplus (% of CBT)", { ticksuffix: "%", zeroline: true, zerolinecolor: C.text2 }),
         // Category index, not the label: a shape reads "2026" as index 2026.
-        shapes: sel >= 0 ? [{ type: "line", xref: "x", yref: "paper", x0: sel, x1: sel, y0: 0, y1: 1, line: { color: C.accent, width: 1, dash: "dot" } }] : [],
+        shapes: sel >= 0 ? [{ type: "line", xref: "x", yref: "paper", x0: sel, x1: sel, y0: 0, y1: 1, line: { color: C.text, width: 1, dash: "dot" } }] : [],
         margin: { l: 64, r: 48, t: 12, b: 40 },
       } as Partial<Layout>),
     };
@@ -448,7 +448,7 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
   const who = pos === "all" ? "players" : `players (${POSITIONS[pos].label.toLowerCase()})`;
   const key = team === "all"
     ? "Blue lines are the three teams with the best average surplus, red the three worst."
-    : `The gold line is the ${teamName(team)}.`;
+    : `The black line is the ${teamName(team)}.`;
   const cls = "h-[440px] w-full max-sm:h-[420px]";
   return (
     <Figure

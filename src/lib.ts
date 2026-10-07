@@ -205,7 +205,7 @@ export const scopeLabel = (team: string, pos: string) =>
   [team !== "all" && teamName(team), pos !== "all" && POSITIONS[pos].label.toLowerCase()].filter(Boolean).join(", ");
 export const teamColor = (code: string) => TEAMS[code]?.[1] ?? "#7c8894";
 export const teamLogo = (code: string) =>
-  TEAMS[code] ? `https://www.mlbstatic.com/team-logos/team-cap-on-dark/${TEAMS[code][2]}.svg` : null;
+  TEAMS[code] ? `https://www.mlbstatic.com/team-logos/team-cap-on-light/${TEAMS[code][2]}.svg` : null;
 // Transparent cut-out headshot; MLB serves a generic silhouette when a player has none.
 export const headshot = (mlbam: number | undefined, width = 240) =>
   mlbam
@@ -214,22 +214,22 @@ export const headshot = (mlbam: number | undefined, width = 240) =>
 
 // Chart colours (Plotly needs literal values, not CSS variables).
 export const C = {
-  text: "#eef2f7",
-  text2: "#a9b8ca",
-  muted: "#7f93ab",
-  line: "#1f3a5c",
-  lineStrong: "#2d4d74",
-  panel: "#11233a",
-  panel2: "#17304d",
-  accent: "#f5b83d",
-  under: "#3987e5",
-  over: "#e66767",
+  text: "#16241b",
+  text2: "#3e4f44",
+  muted: "#56665b",
+  line: "#cad7bf",
+  lineStrong: "#a3b798",
+  panel: "#f5f8f0",
+  panel2: "#dde6d3",
+  accent: "#f5dd3b", // highlighter: fills only
+  under: "#1f5fbf",
+  over: "#bb3027",
 };
 export const FONT = '"Libre Franklin", "Franklin Gothic", system-ui, -apple-system, "Segoe UI", sans-serif';
 
-// Ordinal ramp for seasons (one hue, dark-surface steps 550 -> 100).
-// Newest season is lightest; colour follows the season, never its rank in the selection.
-const SEASON_RAMP = ["#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef", "#9ec5f4", "#b7d3f6", "#cde2fb"];
+// Ordinal ramp for seasons (one blue-ink hue, light -> dark on the paper).
+// Newest season is darkest; colour follows the season, never its rank in the selection.
+const SEASON_RAMP = ["#a9c4ea", "#8fb0e2", "#7499d6", "#5a83ca", "#436ebc", "#3159a9", "#244896", "#1a3a80", "#122d6a", "#0c2155"];
 export function seasonColor(salarySeasons: number[], season: number) {
   const i = salarySeasons.indexOf(season);
   if (i < 0) return C.text2;

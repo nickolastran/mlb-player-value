@@ -214,7 +214,7 @@ function Explorer({ db }: { db: Db }) {
                 <a
                   href={toUrl(db, { ...s, page: "home" })}
                   onClick={(e) => { if (e.button || e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); set({ page: "home" }); }}
-                  className="text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb"
+                  className="text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-chalk"
                 >
                   Dashboard
                 </a>
@@ -382,8 +382,8 @@ function Explorer({ db }: { db: Db }) {
               </div>
             ) : (
               // The card alone sets the row height; the table shows as many rows as fit beside it.
-              // Stacked on phones there's nothing to match, so it's back to the usual 17 rows.
-              <div className="relative min-h-[36rem] max-[900px]:min-h-0 max-[900px]:[&_tbody_tr:nth-child(n+18)]:hidden">
+              // Stacked on phones there's nothing to match, so it keeps the usual 17 rows.
+              <div className="relative min-h-[36rem] max-[900px]:min-h-0">
                 <div className="absolute inset-0 max-[900px]:static">{board(false, true)}</div>
               </div>
             )}

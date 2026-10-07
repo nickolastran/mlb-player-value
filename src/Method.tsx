@@ -3,7 +3,7 @@ import type { Db } from "./lib";
 import { SectionHead } from "./ui";
 
 const Ref = ({ to, id }: { to: string; id: string }) => (
-  <sup><a href={`#fn-${to}`} id={id} className="px-px font-semibold text-bulb no-underline">{to}</a></sup>
+  <sup><a href={`#fn-${to}`} id={id} className="px-px font-semibold text-chalk no-underline">{to}</a></sup>
 );
 
 function Fact({ term, children }: { term: string; children: ReactNode }) {
@@ -53,7 +53,7 @@ export function Method({ db }: { db: Db }) {
       <dl className="mt-7 grid grid-cols-3 gap-x-7 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1 gap-y-[18px] border-t border-line pt-[22px]">
         <Fact term="Data">
           Season stats, WAR, salaries and service time from{" "}
-          <a href="https://www.baseball-reference.com/" rel="noopener" className="underline decoration-line-strong underline-offset-[3px] hover:decoration-bulb">Baseball-Reference</a>,{" "}
+          <a href="https://www.baseball-reference.com/" rel="noopener" className="underline decoration-line-strong underline-offset-[3px] hover:decoration-chalk">Baseball-Reference</a>,{" "}
           {seasons[0].label} through {latest.label}. 2020 is left out: a 60-game season with prorated pay doesn't compare.
           Baseball-Reference skips many pre-arbitration years; for drafted players under 3 years of service those are estimated
           at the league minimum (marked ≈) and left out of training.{sourced}
@@ -84,7 +84,7 @@ export function Method({ db }: { db: Db }) {
 
       <ol className="mt-7 grid grid-cols-2 gap-x-5 border-t border-line pt-[18px] text-sm text-ink-2 max-[760px]:grid-cols-1">
         <li id="fn-a" className="mb-2.5 flex gap-2.5 target:text-chalk">
-          <span className="w-[1ch] flex-none font-bold text-bulb">a</span>
+          <span className="w-[1ch] flex-none font-bold text-chalk">a</span>
           <span>
             The market model reflects how MLB actually pays, including the pre-arbitration and arbitration years set by service
             time. The production model is blind to age and service time and closer to pure on-field worth. Salaries are as
@@ -95,7 +95,7 @@ export function Method({ db }: { db: Db }) {
           </span>
         </li>
         <li id="fn-b" className="mb-2.5 flex gap-2.5 target:text-chalk">
-          <span className="w-[1ch] flex-none font-bold text-bulb">b</span>
+          <span className="w-[1ch] flex-none font-bold text-chalk">b</span>
           <span>
             The 2016 to 2025 seasons are in-sample: the models trained on that data, so historical residuals look slightly better
             than the models would do on new seasons. Rows marked “held-out” on a player card are the exception.{" "}

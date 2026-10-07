@@ -1,12 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { inPos, money, scopeLabel, SORTS, teamLogo, type Db, type ModelId, type Rec, type SortDir, type SortKey } from "./lib";
 import { Headshot, Select, TeamLogo } from "./ui";
 
 const BOARD_ROWS = 17;
-const FILL_ROWS = 50; // ponytail: enough for the tallest card; the rest clip under the fade
 
-const link = "cursor-pointer text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb";
+const link = "cursor-pointer text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-chalk";
 
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
 
@@ -42,7 +41,21 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
     });
   }, [db, season, model, team, pos, sortKey, sortDir, only]);
 
-  const shown = full ? rows : rows.slice(0, fill ? FILL_ROWS : BOARD_ROWS);
+  // In fill mode, show as many whole rows as the box has room for. Uses the average row height,
+  // so a box sized by its own content (stacked on phones) settles where it started instead of growing.
+  const box = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState(BOARD_ROWS);
+  useEffect(() => {
+    const el = box.current;
+    if (!fill || !el) return;
+    const ro = new ResizeObserver(() => {
+      const body = el.querySelector("tbody")!, n = body.rows.length;
+      if (n) setFit(Math.max(1, Math.floor((el.clientHeight - el.querySelector("thead")!.offsetHeight) / (body.offsetHeight / n))));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
+  const shown = full ? rows : rows.slice(0, fill ? fit : BOARD_ROWS);
   const title = sortKey === "surplus"
     ? sortDir === "desc" ? "Most underpaid" : "Most overpaid"
     : `By ${SORTS[sortKey].label}, ${dirText(sortDir).toLowerCase()}`;
@@ -114,7 +127,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
         </div>
       </div>
 
-      <div className={fill ? "min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,black_calc(100%-48px),transparent)]" : ""}>
+      <div ref={box} className={fill ? "min-h-0 flex-1 overflow-hidden" : ""}>
         <table className="w-full border-collapse text-[0.9375rem]">
           <thead>
             <tr>
@@ -131,7 +144,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
                       <button
                         type="button"
                         onClick={() => clickHead(c.key!)}
-                        className={`inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-chalk ${c.num ? "flex-row-reverse" : ""} ${on ? "font-semibold text-bulb" : ""}`}
+                        className={`inline-flex cursor-pointer items-center gap-1 transition-colors hover:text-chalk ${c.num ? "flex-row-reverse" : ""} ${on ? "rounded-sm bg-bulb px-1 font-semibold text-bulb-ink" : ""}`}
                       >
                         {c.label}
                         {on && <span aria-hidden>{sortDir === "desc" ? "↓" : "↑"}</span>}
@@ -153,10 +166,10 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
                 tabIndex={0}
                 onClick={() => onPick(r.id)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(r.id); } }}
-                className={`cursor-pointer border-b border-line outline-none transition-colors hover:bg-panel-2 focus-visible:bg-panel-2 ${r.id === current ? "bg-bulb/[0.07]" : ""}`}
+                className={`cursor-pointer border-b border-line outline-none transition-colors hover:bg-panel-2 focus-visible:bg-panel-2 ${r.id === current ? "bg-bulb/45" : ""}`}
               >
                 <td className={`${cell} py-1.5 text-right tabular-nums text-muted`}>{i + 1}</td>
-                <td className={`${cell} ${width("Player")} py-1.5 ${r.id === current ? "font-semibold text-bulb" : ""}`}>
+                <td className={`${cell} ${width("Player")} py-1.5 ${r.id === current ? "font-semibold" : ""}`}>
                   <span className="flex items-center gap-2.5 [&>*]:flex-none">
                     <Headshot key={r.id} db={db} id={r.id} size={30} />
                     <span title={r.player} className="min-w-0 flex-initial! whitespace-normal sm:truncate">

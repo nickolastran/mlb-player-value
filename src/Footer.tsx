@@ -27,7 +27,7 @@ export function Footer({ db }: { db: Db }) {
               href={l.href}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 border border-line-strong px-2 py-1 transition-colors hover:border-bulb hover:text-chalk"
+              className="flex items-center gap-1.5 border border-line-strong px-2 py-1 transition-colors hover:border-chalk hover:text-chalk"
             >
               <span aria-hidden className="size-[13px] bg-current" style={{ mask: `url(${l.icon}) center / contain no-repeat` }} />
               {l.label}

@@ -5,6 +5,8 @@ import { Headshot, Select, TeamLogo } from "./ui";
 
 const BOARD_ROWS = 17;
 
+const link = "cursor-pointer text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb";
+
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
 
 export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, current, onSort, onShowAll, onPick, only, title: heading, tag }: {
@@ -42,6 +44,25 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
   const title = sortKey === "surplus"
     ? sortDir === "desc" ? "Most underpaid" : "Most overpaid"
     : `By ${SORTS[sortKey].label}, ${dirText(sortDir).toLowerCase()}`;
+
+  // Every row the filters and sort give, not just the ones shown. The BOM keeps accents intact in Excel.
+  const download = () => {
+    const esc = (v: unknown) => {
+      const t = v == null ? "" : String(v);
+      return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const head = ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Surplus", ...(tag ? ["Note"] : [])];
+    const lines = [head, ...rows.map((r, i) => [
+      i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.surplus, ...(tag ? [tag(r)] : []),
+    ])].map((l) => l.map(esc).join(","));
+    const name = [heading ?? `players ${season}`, db.model(model).short, team !== "all" && team, pos !== "all" && pos]
+      .filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv" }));
+    a.download = `mlb-${name}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const clickHead = (key: SortKey) => {
     if (SORTS[key].needsSalary && !salary) return;
@@ -161,15 +182,18 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
       <p className="mx-4 mt-auto max-w-[60ch] pt-2.5 text-[0.8125rem] text-muted">
         Surplus is predicted minus actual salary. Positive means the player is paid less than the model says he's worth. Click a column heading to sort by it.
       </p>
-      {!full && rows.length > BOARD_ROWS && (
-        <button
-          type="button"
-          onClick={onShowAll}
-          className="cursor-pointer self-start px-4 pb-1 pt-2.5 text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-bulb"
-        >
-          Show all {rows.length} players →
-        </button>
-      )}
+      <div className="flex flex-wrap gap-x-5 px-4 pb-1 pt-2.5">
+        {!full && rows.length > BOARD_ROWS && (
+          <button type="button" onClick={onShowAll} className={link}>
+            Show all {rows.length} players →
+          </button>
+        )}
+        {rows.length > 0 && (
+          <button type="button" onClick={download} className={link}>
+            Download CSV
+          </button>
+        )}
+      </div>
     </div>
   );
 }

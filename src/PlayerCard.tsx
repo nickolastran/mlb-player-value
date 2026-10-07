@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId } from "./lib";
+import { C, money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId, type Rec } from "./lib";
 import { EASE, Headshot, TeamLogo, Tween } from "./ui";
 
 const usd = (v: number) => money(v);
@@ -213,7 +214,127 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               : "The market model values him above his on-field production alone, usually because free agents with six-plus years of service get paid for past performance."}
           </p>
         </div>
+        {player.seasons.length > 1 && (
+          <Career key={player.id} db={db} id={player.id} seasons={player.seasons} cardSeason={cardSeason} model={model} onCardSeason={onCardSeason} />
+        )}
       </div>
     </article>
+  );
+}
+
+// Actual vs. predicted salary across every qualifying season. Hover reads out a season, click opens it.
+function Career({ db, id, seasons, cardSeason, model, onCardSeason }: {
+  db: Db;
+  id: string;
+  seasons: number[];
+  cardSeason: number;
+  model: ModelId;
+  onCardSeason: (s: number) => void;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  // x is the index in the manifest, so the skipped 2020 isn't a gap but a season he didn't qualify in is.
+  const all = db.manifest.seasons.map((s) => s.season);
+  const pts = seasons.map((s) => ({ s, x: all.indexOf(s), r: db.find(s, model, id)! }));
+  const paid = pts.filter((p) => p.r.surplus != null);
+  const total = paid.reduce((a, p) => a + p.r.surplus!, 0);
+
+  const W = 400, H = 120, L = 14, R = 14, T = 18, B = 22;
+  const x0 = pts[0].x, x1 = pts[pts.length - 1].x;
+  const peak = Math.max(...pts.map((p) => Math.max(p.r.pred, p.r.salary ?? 0)));
+  const step = peak > 2e7 ? 1e7 : peak > 5e6 ? 5e6 : 1e6;
+  const top = Math.ceil(peak / step) * step;
+  const colW = (W - L - R) / (x1 - x0);
+  const X = (x: number) => L + (x - x0) * colW;
+  const Y = (v: number) => T + (1 - v / top) * (H - T - B);
+  const path = (get: (r: Rec) => number | null) => {
+    let d = "", prev: number | null = null;
+    for (const p of pts) {
+      const v = get(p.r);
+      if (v == null) { prev = null; continue; }
+      d += `${prev != null && p.x === prev + 1 ? "L" : "M"}${X(p.x)},${Y(v)}`;
+      prev = p.x;
+    }
+    return d;
+  };
+
+  const shown = pts.find((p) => p.s === (hover ?? cardSeason)) ?? pts[pts.length - 1];
+  const sr = shown.r;
+
+  return (
+    <section aria-label="Career" className="mt-3.5 rounded-lg border border-line px-3.5 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h4 className="font-semibold">Career</h4>
+        {paid.length > 0 && (
+          <span className="text-sm text-ink-2">
+            Surplus over {paid.length} paid season{paid.length > 1 ? "s" : ""}{" "}
+            <span className={`text-lg font-bold tabular-nums ${total >= 0 ? "text-under" : "text-over"}`}>{usdSigned(total)}</span>
+          </span>
+        )}
+      </div>
+      <p aria-live="off" className="mt-1 text-sm tabular-nums text-ink-2">
+        <span className="font-semibold text-chalk">{db.label(shown.s)}</span>
+        {" · "}Paid {sr.salary != null ? `${sr.salary_est ? "≈" : ""}${usd(sr.salary)}` : "—"}
+        {" · "}Predicted {usd(sr.pred)}
+        {sr.surplus != null && (
+          <>{" · "}<span className={`whitespace-nowrap ${sr.surplus >= 0 ? "text-under" : "text-over"}`}>{usdSigned(sr.surplus)}</span></>
+        )}
+      </p>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="mt-1 block w-full"
+        role="img"
+        aria-label={`Actual and predicted salary for each season from ${db.label(pts[0].s)} to ${db.label(pts[pts.length - 1].s)}`}
+        onMouseLeave={() => setHover(null)}
+      >
+        {[0, top].map((v) => (
+          <g key={v}>
+            <line x1={0} x2={W} y1={Y(v)} y2={Y(v)} stroke={v ? C.line : C.lineStrong} />
+            {v > 0 && <text x={0} y={Y(v) - 4} fontSize={12} fill={C.muted}>{usd(v)}</text>}
+          </g>
+        ))}
+        {pts.map((p) => (
+          <rect
+            key={p.s}
+            x={X(p.x) - colW / 2}
+            y={T - 6}
+            width={colW}
+            height={H - T - B + 6}
+            fill={p.s === cardSeason ? C.accent : p.s === hover ? C.panel2 : "transparent"}
+            fillOpacity={p.s === cardSeason ? 0.12 : 1}
+          />
+        ))}
+        <path d={path((r) => r.pred)} fill="none" stroke={C.text2} strokeWidth={2} strokeDasharray="5 4" />
+        <path d={path((r) => r.salary)} fill="none" stroke={C.text} strokeWidth={2} />
+        {pts.map((p) => (
+          <g key={p.s}>
+            <circle cx={X(p.x)} cy={Y(p.r.pred)} r={3.5} fill={C.text2} stroke={C.panel} strokeWidth={2} />
+            {p.r.salary != null && (
+              <circle cx={X(p.x)} cy={Y(p.r.salary)} r={4} fill={p.r.salary_est ? C.panel : C.text} stroke={p.r.salary_est ? C.text : C.panel} strokeWidth={2} />
+            )}
+            <text x={X(p.x)} y={H - 6} fontSize={12} textAnchor="middle" fill={p.s === cardSeason ? C.text : C.muted} fontWeight={p.s === cardSeason ? 600 : 400}>
+              {colW < 34 ? `'${db.label(p.s).slice(-2)}` : db.label(p.s)}
+            </text>
+          </g>
+        ))}
+        {/* Hit targets on top: a whole column per season, wider than any mark. Keyboard users have the season pills. */}
+        {pts.map((p) => (
+          <rect
+            key={p.s}
+            x={X(p.x) - colW / 2}
+            y={0}
+            width={colW}
+            height={H}
+            fill="transparent"
+            className="cursor-pointer"
+            onMouseEnter={() => setHover(p.s)}
+            onClick={() => onCardSeason(p.s)}
+          />
+        ))}
+      </svg>
+      <div aria-hidden className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
+        <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-chalk" />Actual salary</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-ink-2" />{db.model(model).label} prediction</span>
+      </div>
+    </section>
   );
 }

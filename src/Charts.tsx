@@ -384,3 +384,101 @@ export function TeamBars({ db, season, model, team, pos }: { db: Db; season: num
     </>
   );
 }
+
+// ---------- Team surplus over time ----------
+
+// One line per team in % of CBT so seasons compare fairly. Thirty lines are unreadable,
+// so only the selected team, or the three best and worst on average, get color.
+export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: number; model: ModelId; team: string; pos: string }) {
+  const seasons = useMemo(() => db.manifest.seasons.filter((s) => s.has_salary), [db]);
+
+  const { lines, best, worst } = useMemo(() => {
+    const lines = db.manifest.teams.map((t) => {
+      const vals = seasons.map((s) => {
+        const rows = db.recs(s.season, model).filter((r) => r.team === t && r.salary != null && !r.traded && inPos(r, pos));
+        return rows.length ? rows.reduce((a, r) => a + r.surplus_pct!, 0) : null;
+      });
+      const got = vals.filter((v) => v != null);
+      return { team: t, vals, avg: got.length ? got.reduce((a, v) => a + v, 0) / got.length : 0 };
+    }).sort((a, b) => b.avg - a.avg);
+    return { lines, best: new Set(lines.slice(0, 3).map((l) => l.team)), worst: new Set(lines.slice(-3).map((l) => l.team)) };
+  }, [db, seasons, model, pos]);
+
+  const plot = useMemo(() => {
+    const color = (t: string) =>
+      team !== "all" ? (t === team ? C.accent : null) : best.has(t) ? C.under : worst.has(t) ? C.over : null;
+    const x = seasons.map((s) => s.label);
+    // Grey lines first so the colored ones draw on top.
+    const ordered = [...lines].sort((a, b) => Number(color(a.team) != null) - Number(color(b.team) != null));
+    const data = ordered.map((l): Data => {
+      const c = color(l.team);
+      const end = l.vals.findLastIndex((v) => v != null);
+      return {
+        type: "scatter",
+        mode: c ? "lines+markers+text" : "lines",
+        x,
+        y: l.vals.map((v) => (v == null ? null : v * 100)),
+        line: { color: c ?? C.lineStrong, width: 2 },
+        marker: { color: c ?? C.lineStrong, size: 8, line: { color: C.panel, width: 2 } },
+        opacity: c ? 1 : 0.7,
+        hovertext: l.vals.map((v, i) => `<b>${escapeHtml(teamName(l.team))}, ${x[i]}</b><br>Surplus <b>${pct(v, true)}</b> of CBT<br>Average ${pct(l.avg, true)}`),
+        hovertemplate: "%{hovertext}<extra></extra>",
+        // Team code at the end of each colored line, so identity isn't color alone.
+        text: l.vals.map((_, i) => (i === end ? l.team : "")),
+        textposition: "middle right",
+        textfont: { size: 12, color: C.text },
+        cliponaxis: false,
+        connectgaps: true,
+        showlegend: false,
+      } as Data;
+    });
+    const sel = seasons.findIndex((s) => s.season === season);
+    return {
+      data,
+      layout: baseLayout({
+        xaxis: axis("", { showgrid: false, type: "category" }),
+        yaxis: axis("Total surplus (% of CBT)", { ticksuffix: "%", zeroline: true, zerolinecolor: C.text2 }),
+        // Category index, not the label: a shape reads "2026" as index 2026.
+        shapes: sel >= 0 ? [{ type: "line", xref: "x", yref: "paper", x0: sel, x1: sel, y0: 0, y1: 1, line: { color: C.accent, width: 1, dash: "dot" } }] : [],
+        margin: { l: 64, r: 48, t: 12, b: 40 },
+      } as Partial<Layout>),
+    };
+  }, [lines, best, worst, seasons, season, team]);
+
+  const who = pos === "all" ? "players" : `players (${POSITIONS[pos].label.toLowerCase()})`;
+  const key = team === "all"
+    ? "Blue lines are the three teams with the best average surplus, red the three worst."
+    : `The gold line is the ${teamName(team)}.`;
+  const cls = "h-[440px] w-full max-sm:h-[420px]";
+  return (
+    <Figure
+      title="Team surplus over time"
+      note={`${db.model(model).label} prediction minus actual salary, summed across each roster's qualifying ${who}, as a share of each season's tax threshold. ${key} Grey lines are the other teams; hover any line to name it. Traded players are left out.`}
+    >
+      <Plot data={plot.data} layout={plot.layout} className={cls} label="Line chart of each team's total surplus by season" />
+      <details className="px-2 pb-2 text-[0.9375rem]">
+        <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full border-collapse tabular-nums">
+            <thead>
+              <tr className="text-left text-muted">
+                <th scope="col" className="py-1 pr-3 font-medium">Team</th>
+                {seasons.map((s) => <th key={s.season} scope="col" className="py-1 pr-3 text-right font-medium">{s.label}</th>)}
+                <th scope="col" className="py-1 text-right font-medium">Average</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => (
+                <tr key={l.team} className="border-t border-line">
+                  <th scope="row" className="py-1 pr-3 text-left font-medium">{teamName(l.team)}</th>
+                  {l.vals.map((v, i) => <td key={i} className="py-1 pr-3 text-right">{pct(v, true)}</td>)}
+                  <td className="py-1 text-right font-semibold">{pct(l.avg, true)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </Figure>
+  );
+}

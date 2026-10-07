@@ -5,7 +5,7 @@ import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from 
 import { Search } from "./Search";
 import { PlayerCard } from "./PlayerCard";
 import { Leaderboard } from "./Leaderboard";
-import { Scatters, TeamBars } from "./Charts";
+import { Scatters, TeamBars, TeamTrend } from "./Charts";
 import { Method } from "./Method";
 import { Footer } from "./Footer";
 
@@ -434,6 +434,7 @@ function Explorer({ db }: { db: Db }) {
         <section id="teams" aria-labelledby="teams-title" className={SECTION}>
           <SectionHead id="teams-title" title="Team surplus" />
           <TeamBars db={db} season={s.season} model={s.model} team={s.team} pos={s.pos} />
+          <TeamTrend db={db} season={s.season} model={s.model} team={s.team} pos={s.pos} />
         </section>
 
         <Method db={db} />

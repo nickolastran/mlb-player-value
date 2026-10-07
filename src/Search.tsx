@@ -4,7 +4,12 @@ import { normalize, type Db, type Player } from "./lib";
 import { Headshot, TeamLogo } from "./ui";
 
 // Combobox over every qualifying player.
-export function Search({ db, season, onPick }: { db: Db; season: number; onPick: (id: string, season: number) => void }) {
+export function Search({ db, season, onPick, placeholder = "Search a player, e.g. Aaron Judge" }: {
+  db: Db;
+  season: number;
+  onPick: (id: string, season: number) => void;
+  placeholder?: string;
+}) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -37,7 +42,7 @@ export function Search({ db, season, onPick }: { db: Db; season: number; onPick:
   };
 
   return (
-    <div className="relative mb-5 max-w-[560px]">
+    <div className="relative mb-5 max-w-[560px] flex-1">
       <label htmlFor="player-search" className="sr-only">Search players</label>
       <svg aria-hidden viewBox="0 0 20 20" className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-muted">
         <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -48,7 +53,7 @@ export function Search({ db, season, onPick }: { db: Db; season: number; onPick:
         type="search"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Search a player, e.g. Aaron Judge"
+        placeholder={placeholder}
         role="combobox"
         aria-expanded={shown}
         aria-controls="search-results"

@@ -46,6 +46,8 @@ interface State {
   sortDir: SortDir;
   player: string | null;
   cardSeason: number | null;
+  vs: string | null; // second player in compare mode
+  vsSeason: number | null;
 }
 
 const PAGES = { home: "/", players: "/players" } as const;
@@ -72,7 +74,7 @@ function initialState(db: Db): State {
   const s: State = {
     page: location.pathname === PAGES.players || p.get("view") === "players" ? "players" : "home",
     season: defaultSeason(db),
-    model: "market", team: "all", pos: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null,
+    model: "market", team: "all", pos: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null, vs: null, vsSeason: null,
   };
   const season = Number(p.get("season"));
   if (db.info(season)) s.season = season;
@@ -85,8 +87,13 @@ function initialState(db: Db): State {
   const [sk, sd] = (p.get("sort") ?? "").split("-");
   if (sk in SORTS) s.sortKey = sk as SortKey;
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
-  const id = p.get("player");
+  const [cmp, vs] = (p.get("compare") ?? "").split(",");
+  const id = cmp || p.get("player");
   s.player = id && db.players.has(id) ? id : topPlayer(db, s.season, s.model);
+  if (s.player && vs && db.players.has(vs)) {
+    s.vs = vs;
+    s.vsSeason = cardFor(db, vs, s.season);
+  }
   if (s.player) {
     const cs = Number(p.get("card"));
     s.cardSeason = db.players.get(s.player)!.seasons.includes(cs) ? cs : cardFor(db, s.player, s.season);
@@ -101,9 +108,10 @@ function toUrl(db: Db, s: State) {
   if (s.team !== "all") p.set("team", s.team);
   if (s.pos !== "all") p.set("pos", s.pos);
   if (s.sortKey !== "surplus" || s.sortDir !== "desc") p.set("sort", `${s.sortKey}-${s.sortDir}`);
-  if (s.player && s.player !== topPlayer(db, s.season, s.model)) p.set("player", s.player);
+  if (s.player && s.vs) p.set("compare", `${s.player},${s.vs}`);
+  else if (s.player && s.player !== topPlayer(db, s.season, s.model)) p.set("player", s.player);
   if (s.player && s.cardSeason !== cardFor(db, s.player, s.season)) p.set("card", String(s.cardSeason));
-  const q = p.toString();
+  const q = p.toString().replace(/%2C/g, ","); // keep compare=a,b readable
   return PAGES[s.page] + (q ? `?${q}` : "");
 }
 
@@ -116,6 +124,8 @@ function Explorer({ db }: { db: Db }) {
   const [unit, setUnit] = useState<Unit>("usd");
   const [faSort, setFaSort] = useState<[SortKey, SortDir]>(["pred", "desc"]);
   const [faAll, setFaAll] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const comparing = picking || s.vs != null;
   const cardRef = useRef<HTMLDivElement>(null);
   const scrollToCard = useRef(false);
 
@@ -147,8 +157,8 @@ function Explorer({ db }: { db: Db }) {
     setUnit(next.length > 1 ? "pct" : "usd");
   };
   const setSeason = (season: number) => {
-    const ps = s.player ? db.players.get(s.player)!.seasons : [];
-    set({ season, ...(ps.includes(season) ? { cardSeason: season } : {}) });
+    const has = (id: string | null) => id != null && db.players.get(id)!.seasons.includes(season);
+    set({ season, ...(has(s.player) ? { cardSeason: season } : {}), ...(has(s.vs) ? { vsSeason: season } : {}) });
     setPickedSeasons(db.hasSalary(season) ? [season] : []);
   };
   const openPlayer = (id: string, season: number, scroll: boolean) => {
@@ -327,9 +337,28 @@ function Explorer({ db }: { db: Db }) {
             title="Player lookup"
             note={`Search any hitter with ${db.manifest.min_pa}+ plate appearances or pitcher with ${db.manifest.min_ip}+ innings in a season, or click a dot on the charts below.`}
           />
-          <Search db={db} season={s.season} onPick={(id, season) => openPlayer(id, season, false)} />
-          <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-5 max-[900px]:grid-cols-1">
-            <div ref={cardRef} className="scroll-mt-24">
+          <div className="flex items-start gap-3">
+            <Search
+              db={db}
+              season={s.season}
+              onPick={(id, season) => (comparing ? set({ vs: id, vsSeason: season }) : openPlayer(id, season, false))}
+              placeholder={comparing && s.player ? `Compare ${db.players.get(s.player)!.name} with…` : undefined}
+            />
+            {s.player && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (comparing) { setPicking(false); set({ vs: null, vsSeason: null }); }
+                  else { setPicking(true); document.getElementById("player-search")?.focus(); }
+                }}
+                className="h-12 flex-none cursor-pointer rounded-xl border border-line-strong bg-panel px-4 font-semibold text-ink-2 transition-colors hover:border-ink-2 hover:text-chalk"
+              >
+                {comparing ? "Done comparing" : "Compare"}
+              </button>
+            )}
+          </div>
+          <div className={`grid gap-5 max-[900px]:grid-cols-1 ${comparing ? "grid-cols-2" : "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"}`}>
+            <div ref={cardRef} className="min-w-0 scroll-mt-24">
               <PlayerCard
                 db={db}
                 playerId={s.player}
@@ -339,8 +368,20 @@ function Explorer({ db }: { db: Db }) {
                 onCardSeason={(cardSeason) => set({ cardSeason })}
               />
             </div>
-            {board(false)}
+            {comparing ? (
+              <div className="min-w-0">
+                <PlayerCard
+                  db={db}
+                  playerId={s.vs}
+                  cardSeason={s.vsSeason}
+                  season={s.season}
+                  model={s.model}
+                  onCardSeason={(vsSeason) => set({ vsSeason })}
+                />
+              </div>
+            ) : board(false)}
           </div>
+          {comparing && <div className="mt-5">{board(false)}</div>}
         </motion.section>
 
         {hasFa && (

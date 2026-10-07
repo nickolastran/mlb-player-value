@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { inPos, money, scopeLabel, SORTS, teamLogo, type Db, type ModelId, type Rec, type SortDir, type SortKey } from "./lib";
 import { Headshot, Select, TeamLogo } from "./ui";
 
-const BOARD_ROWS = 12;
+const BOARD_ROWS = 17;
 
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
 

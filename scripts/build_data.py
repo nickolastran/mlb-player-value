@@ -16,6 +16,9 @@ salary as a share of that season's luxury-tax (CBT) threshold:
 Seasons before the latest are split 80/20 into train/test. The latest season
 is never trained on, so it's fully out-of-sample.
 
+Why: each prediction split into per-stat contributions with SHAP (TreeExplainer,
+exact for random forests). They sum, with the role's average prediction, to the prediction.
+
 Comparables: each player-season's nearest neighbours on the model stats plus age
 (standardised), among other players in other seasons with a listed salary.
 
@@ -33,6 +36,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import shap
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
@@ -80,7 +84,7 @@ def num(value, digits: int | None = None):
 
 
 def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
-    """Adds pred_<model> columns (share of CBT) and a split column; returns test R² per model."""
+    """Adds pred_<model> and why_<model> columns (share of CBT) and a split column; returns test R² per model."""
     latest = df["Season"].max()
     df["split"] = "projection"
     # Train and score only on salaries Baseball-Reference lists, not our pre-arb estimates.
@@ -92,6 +96,7 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     r2 = {}
     for model, spec in MODELS.items():
         df[f"pred_{model}"] = np.nan
+        df[f"why_{model}"] = None
         for role, cols in FEATURES.items():
             cols = cols + spec["extra"]
             rows = df["Role"] == role
@@ -99,6 +104,9 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
             rf = RandomForestRegressor(n_estimators=400, min_samples_leaf=10, random_state=42, n_jobs=-1)
             rf.fit(df.loc[fit, cols], df.loc[fit, "share"])
             df.loc[rows, f"pred_{model}"] = rf.predict(df.loc[rows, cols])
+            # Checks that the contributions plus the average sum to the prediction.
+            parts = shap.TreeExplainer(rf).shap_values(df.loc[rows, cols])
+            df.loc[rows, f"why_{model}"] = pd.Series([dict(zip(cols, p)) for p in parts], index=df.index[rows])
         test = df.index.isin(te)
         r2[model] = round(r2_score(df.loc[test, "share"], df.loc[test, f"pred_{model}"]), 2)
     return df, r2
@@ -157,6 +165,10 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
         else:
             rec.update(ip=num(r["IP"], 1), gs=num(r["GS"]), sv=num(r["SV"]), era=num(r["ERA"], 2),
                        era_plus=num(r["ERA_plus"]), so=num(r["SO"]), whip=num(r["WHIP"], 2))
+        # Stat -> dollars it adds to (or takes off) the prediction, biggest first. The rest of the
+        # prediction is the role's average, so the frontend gets it as pred minus the sum.
+        why = sorted(r[f"why_{model}"].items(), key=lambda kv: -abs(kv[1]))
+        rec["why"] = [[k, int(round(v * cbt, -3))] for k, v in why]
         # Comparables don't depend on the model, so only the market file carries them.
         if model == "market":
             rec["comps"] = r["comps"]

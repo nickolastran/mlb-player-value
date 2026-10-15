@@ -30,6 +30,7 @@ export interface Rec {
   // Contract status as of the scrape, newest season only
   fa?: number | null; // first free-agent season
   fa_option?: "team" | "player" | "mutual" | null; // an option covering that season
+  why: [string, number][]; // [model feature, dollars it adds to the prediction], biggest first; the rest is the role average
   comps?: [string, number][]; // [id, season] of the most similar paid seasons by other players; market file only
   // Hitters
   pa?: number;

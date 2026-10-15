@@ -18,11 +18,11 @@ What MLB players *should* earn based on their production, next to what they're a
 
 ## Updating the data
 
-You need Python 3.9+ with `pip install pandas scikit-learn requests`.
+You need Python 3.9+ with `pip install pandas scikit-learn shap requests`.
 
 ```bash
 python scripts/scrape.py       # slow the first time: ~2,000 player pages at 4 s each
-python scripts/build_data.py   # seconds
+python scripts/build_data.py   # about a minute
 python scripts/player_ids.py   # seconds; only needed when new players appear
 ```
 
@@ -56,5 +56,6 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **Production value model.** The same without age and service time. The gap between the two is the *service-time discount*: what pre-arbitration and arbitration rules save teams.
 - **Who's included.** Hitters with 300+ PA, pitchers with 50+ IP. Two-way players count as hitters with both WARs added.
 - **Salaries.** From Baseball-Reference player pages. Pre-arbitration years it skips are estimated at the league minimum (shown as ≈, never trained on) for drafted players under 3 years of service; `python scripts/test_fill_gap.py` checks that rule. A salary listed under a team the player didn't play for (usually an option buyout) is dropped.
+- **Why this prediction.** SHAP values (TreeExplainer) split each prediction into what every stat added or took off, starting from the average hitter or pitcher.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.

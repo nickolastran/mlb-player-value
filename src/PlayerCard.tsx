@@ -214,12 +214,56 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               : "The market model values him above his on-field production alone, usually because free agents with six-plus years of service get paid for past performance."}
           </p>
         </div>
+        <Why r={rec[model]} label={db.model(model).label} />
         {base.comps && base.comps.length > 0 && <Comps db={db} comps={base.comps} cardSeason={cardSeason} />}
         {player.seasons.length > 1 && (
           <Career key={player.id} db={db} id={player.id} seasons={player.seasons} cardSeason={cardSeason} model={model} onCardSeason={onCardSeason} />
         )}
       </div>
     </article>
+  );
+}
+
+const FEATURE: Record<string, string> = {
+  G: "Games", BA: "AVG", OPS_plus: "OPS+", GS: "Starts", SV: "Saves", ERA_plus: "ERA+", SO: "Strikeouts", Service: "Service time",
+};
+const TOP = 5;
+
+// SHAP breakdown: the role's average prediction, plus what each stat added or took off.
+function Why({ r, label }: { r: Rec; label: string }) {
+  const sum = (xs: [string, number][]) => xs.reduce((a, [, v]) => a + v, 0);
+  const rest = r.why.slice(TOP);
+  const rows: [string, number][] = [...r.why.slice(0, TOP).map(([k, v]): [string, number] => [FEATURE[k] ?? k, v]), ...(rest.length ? [["Other stats", sum(rest)] as [string, number]] : [])];
+  const max = Math.max(...rows.map(([, v]) => Math.abs(v)));
+
+  return (
+    <section aria-label="Why this prediction" className="mt-3.5 rounded-lg border border-line px-3.5 py-3">
+      <h4 className="font-semibold">Why this prediction</h4>
+      <p className="mt-1 text-sm text-ink-2">
+        What each stat added to or took off the {label.toLowerCase()} model's prediction, starting from the average {r.role === "H" ? "hitter" : "pitcher"}.
+      </p>
+      <dl className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 text-sm tabular-nums">
+        <dt className="text-ink-2">Average {r.role === "H" ? "hitter" : "pitcher"}</dt>
+        <dd />
+        <dd className="text-right">{usd(r.pred - sum(r.why))}</dd>
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt>{k}</dt>
+            <dd aria-hidden className="grid grid-cols-2">
+              <span className="flex justify-end border-r border-line-strong">
+                {v < 0 && <span className="h-2.5 rounded-l-sm bg-ink-2" style={{ width: `${(-v / max) * 100}%` }} />}
+              </span>
+              <span>{v > 0 && <span className="block h-2.5 rounded-r-sm bg-ink-2" style={{ width: `${(v / max) * 100}%` }} />}</span>
+            </dd>
+            <dd className="text-right">{usdSigned(v)}</dd>
+          </div>
+        ))}
+        <div aria-hidden className="col-span-3 border-t border-line" />
+        <dt className="font-semibold">Prediction</dt>
+        <dd />
+        <dd className="text-right font-semibold">{usd(r.pred)}</dd>
+      </dl>
+    </section>
   );
 }
 

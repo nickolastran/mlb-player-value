@@ -37,7 +37,7 @@ export function Method({ db }: { db: Db }) {
 
       <div className="grid grid-cols-2 gap-5 max-[760px]:grid-cols-1">
         {model("Market value", "market", <>
-          Random forests trained on each player's season stats plus his age, MLB service time and track record (last season's
+          Random forests trained on each player's season stats and, for hitters, his position, plus his age, MLB service time and track record (last season's
           WAR and his total over the last five), one for hitters and one for pitchers. They predict salary as a share of that season's luxury-tax threshold. Because they know service time, they
           learn how the league actually pays: near-minimum salaries for three years, arbitration raises until six, then free
           agency, where contracts are priced on the seasons before them.<Ref to="a" id="ref-a1" />

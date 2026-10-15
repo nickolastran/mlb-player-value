@@ -65,7 +65,7 @@ CBT = {
 }
 
 FEATURES = {
-    "H": ["G", "PA", "WAR", "HR", "SB", "BA", "OBP", "SLG", "OPS_plus"],
+    "H": ["G", "PA", "WAR", "HR", "SB", "BA", "OBP", "SLG", "OPS_plus", "Pos_adj"],
     "P": ["G", "GS", "IP", "WAR", "SV", "ERA", "ERA_plus", "FIP", "WHIP", "SO"],
 }
 MODELS = {
@@ -74,6 +74,9 @@ MODELS = {
     "production": {"label": "Production value", "short": "Production", "extra": [],
                    "description": "Stats only. Closer to pure on-field worth."},
 }
+# Hitter position as one number: the standard positional adjustment, runs per 162 games.
+# Harder positions score higher, so a tree can split "catcher or shortstop" vs "corner bat".
+POS_ADJ = {"C": 12.5, "SS": 7.5, "2B": 2.5, "3B": 2.5, "CF": 2.5, "UT": 0, "LF": -7.5, "RF": -7.5, "1B": -12.5, "DH": -17.5}
 MIN_PA, MIN_IP = 300, 50
 N_COMPS = 5
 
@@ -192,6 +195,10 @@ def main() -> None:
     # Below the league minimum means a partial or bonus-only entry, not a season salary.
     df.loc[df["Salary"] < 400_000, "Salary"] = np.nan
     df["share"] = df["Salary"] / df["Season"].map(CBT)
+    df["Pos_adj"] = df["Pos"].map(POS_ADJ)
+    unknown = sorted(set(df.loc[(df["Role"] == "H") & df["Pos_adj"].isna(), "Pos"]))
+    if unknown:
+        sys.exit(f"No positional adjustment for {unknown}. Add them to POS_ADJ in scripts/build_data.py")
 
     df, r2 = train(df)
     print(f"Test R²: {r2}")

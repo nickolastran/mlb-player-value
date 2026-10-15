@@ -52,7 +52,7 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 
 ## Methodology in brief
 
-- **Market value model.** Random forests (one for hitters, one for pitchers) on season stats, WAR, age, service time and track record (last season's WAR and the last five seasons' total, from the league pages, so seasons that didn't qualify still count). Predicts salary as a share of the season's competitive balance tax threshold.
+- **Market value model.** Random forests (one for hitters, one for pitchers) on season stats, WAR, hitter position (as the standard positional adjustment: C highest, DH lowest), age, service time and track record (last season's WAR and the last five seasons' total, from the league pages, so seasons that didn't qualify still count). Predicts salary as a share of the season's competitive balance tax threshold.
 - **Production value model.** The same without age, service time and track record. The gap between the two is the *service-time discount*: what pre-arbitration and arbitration rules save teams.
 - **Who's included.** Hitters with 300+ PA, pitchers with 50+ IP. Two-way players count as hitters with both WARs added.
 - **Salaries.** From Baseball-Reference player pages. Pre-arbitration years it skips are estimated at the league minimum (shown as ≈, never trained on) for drafted players under 3 years of service; `python scripts/test_fill_gap.py` checks that rule. A salary listed under a team the player didn't play for (usually an option buyout) is dropped.

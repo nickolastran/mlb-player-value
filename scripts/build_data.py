@@ -9,8 +9,10 @@ Usage (from the repo root):
 Models (random forests, one pair for hitters and one for pitchers), predicting
 salary as a share of that season's luxury-tax (CBT) threshold:
 
-    market      stats + age + service time. Learns how MLB actually pays:
-                near-minimum pre-arbitration deals, arbitration raises, free agency.
+    market      stats + age + service time + track record (last season's WAR and
+                the last five seasons' total). Learns how MLB actually pays:
+                near-minimum pre-arbitration deals, arbitration raises, free agency
+                contracts signed on past seasons.
     production  stats only. Closer to pure on-field worth.
 
 Seasons before the latest are split 80/20 into train/test. The latest season
@@ -67,8 +69,8 @@ FEATURES = {
     "P": ["G", "GS", "IP", "WAR", "SV", "ERA", "ERA_plus", "FIP", "WHIP", "SO"],
 }
 MODELS = {
-    "market": {"label": "Market value", "short": "Market", "extra": ["Age", "Service"],
-               "description": "Age- and service-aware. Learns how MLB actually pays."},
+    "market": {"label": "Market value", "short": "Market", "extra": ["Age", "Service", "WAR_prev", "WAR_prev5"],
+               "description": "Knows age, service time and track record. Learns how MLB actually pays."},
     "production": {"label": "Production value", "short": "Production", "extra": [],
                    "description": "Stats only. Closer to pure on-field worth."},
 }

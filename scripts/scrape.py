@@ -6,6 +6,7 @@ Usage (from the repo root):
     python scripts/scrape.py
 
 Per season it reads two league pages (standard batting, standard pitching),
+plus the five seasons before the first for track record (prior WAR),
 then one page per qualifying player for the salary and service-time table.
 Every page is cached in .cache/, so a rerun only fetches what's new. Requests
 are spaced 4 seconds apart to stay under Baseball-Reference's rate limit
@@ -256,6 +257,13 @@ def season_rows(season: int) -> list[dict]:
     return out
 
 
+def season_war(season: int) -> dict[str, float]:
+    """{player id: batting + pitching WAR} for everyone who played, qualifying or not."""
+    bat = first_rows(fetch(f"/leagues/majors/{season}-standard-batting.shtml"), "players_standard_batting")
+    pit = first_rows(fetch(f"/leagues/majors/{season}-standard-pitching.shtml"), "players_standard_pitching")
+    return {pid: (f(bat.get(pid, {}).get("b_war")) or 0) + (f(pit.get(pid, {}).get("p_war")) or 0) for pid in set(bat) | set(pit)}
+
+
 def main() -> None:
     rows = []
     for season in SEASONS:
@@ -280,6 +288,14 @@ def main() -> None:
         if r["Service"] is not None:
             r["Service"] = round(r["Service"], 3)
         r["FA"], r["FA_option"] = contract(r["bref_id"])  # current status, the same on every row
+
+    # Track record: salaries are set on past seasons. No MLB time counts as 0 WAR.
+    # ponytail: 2020's 60-game WAR isn't scaled up; it moved test R² by 0.01 either way.
+    war = {s: season_war(s) for s in range(min(SEASONS) - 5, max(SEASONS))}
+    for r in rows:
+        s, pid = r["Season"], r["bref_id"]
+        r["WAR_prev"] = round(war[s - 1].get(pid, 0), 2)
+        r["WAR_prev5"] = round(sum(war[y].get(pid, 0) for y in range(s - 5, s)), 2)
 
     with OUT.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

@@ -226,6 +226,7 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
 
 const FEATURE: Record<string, string> = {
   G: "Games", BA: "AVG", OPS_plus: "OPS+", GS: "Starts", SV: "Saves", ERA_plus: "ERA+", SO: "Strikeouts", Service: "Service time",
+  WAR_prev: "Last season's WAR", WAR_prev5: "WAR, last 5 seasons",
 };
 const TOP = 5;
 

@@ -37,13 +37,13 @@ export function Method({ db }: { db: Db }) {
 
       <div className="grid grid-cols-2 gap-5 max-[760px]:grid-cols-1">
         {model("Market value", "market", <>
-          Random forests trained on each player's season stats plus his age and MLB service time, one for hitters and one for
-          pitchers. They predict salary as a share of that season's luxury-tax threshold. Because they know service time, they
+          Random forests trained on each player's season stats plus his age, MLB service time and track record (last season's
+          WAR and his total over the last five), one for hitters and one for pitchers. They predict salary as a share of that season's luxury-tax threshold. Because they know service time, they
           learn how the league actually pays: near-minimum salaries for three years, arbitration raises until six, then free
-          agency.<Ref to="a" id="ref-a1" />
+          agency, where contracts are priced on the seasons before them.<Ref to="a" id="ref-a1" />
         </>)}
         {model("Production value", "production", <>
-          The same models with age and service time removed. They can only price what a player does on the field, so they
+          The same models with age, service time and track record removed. They can only price what a player does on the field, so they
           explain much less of real salaries (most MLB contracts were signed on past seasons, not this one) but sit closer to
           pure on-field worth.<Ref to="a" id="ref-a2" /> The gap between the two predictions is the <em>service-time discount</em> shown
           on each player card.

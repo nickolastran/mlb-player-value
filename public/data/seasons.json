@@ -128,8 +128,8 @@
       "id": "market",
       "label": "Market value",
       "short": "Market",
-      "r2": 0.61,
-      "description": "Age- and service-aware. Learns how MLB actually pays."
+      "r2": 0.73,
+      "description": "Knows age, service time and track record. Learns how MLB actually pays."
     },
     {
       "id": "production",

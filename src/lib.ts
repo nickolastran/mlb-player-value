@@ -251,6 +251,13 @@ export function seasonColor(salarySeasons: number[], season: number) {
 
 // ---------- Formatting ----------
 
+// Model feature names (build_data.py) as the site shows them.
+const FEATURE: Record<string, string> = {
+  G: "Games", BA: "AVG", OPS_plus: "OPS+", GS: "Starts", SV: "Saves", ERA_plus: "ERA+", SO: "Strikeouts", Service: "Service time", Pos_adj: "Position",
+  WAR_prev: "Last season's WAR", WAR_prev5: "WAR, last 5 seasons",
+};
+export const featureLabel = (k: string) => FEATURE[k] ?? k;
+
 export function money(v: number | null | undefined, signed = false) {
   if (v == null || Number.isNaN(v)) return "—";
   const sign = v < 0 ? "−" : signed && v > 0 ? "+" : "";

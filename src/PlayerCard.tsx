@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { C, money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId, type Rec } from "./lib";
+import { C, featureLabel, money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId, type Rec } from "./lib";
 import { EASE, Headshot, TeamLogo, Tween } from "./ui";
 
 const usd = (v: number) => money(v);
@@ -225,17 +225,13 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
   );
 }
 
-const FEATURE: Record<string, string> = {
-  G: "Games", BA: "AVG", OPS_plus: "OPS+", GS: "Starts", SV: "Saves", ERA_plus: "ERA+", SO: "Strikeouts", Service: "Service time", Pos_adj: "Position",
-  WAR_prev: "Last season's WAR", WAR_prev5: "WAR, last 5 seasons",
-};
 const TOP = 5;
 
 // SHAP breakdown: the role's average prediction, plus what each stat added or took off.
 function Why({ r, label }: { r: Rec; label: string }) {
   const sum = (xs: [string, number][]) => xs.reduce((a, [, v]) => a + v, 0);
   const rest = r.why.slice(TOP);
-  const rows: [string, number][] = [...r.why.slice(0, TOP).map(([k, v]): [string, number] => [FEATURE[k] ?? k, v]), ...(rest.length ? [["Other stats", sum(rest)] as [string, number]] : [])];
+  const rows: [string, number][] = [...r.why.slice(0, TOP).map(([k, v]): [string, number] => [featureLabel(k), v]), ...(rest.length ? [["Other stats", sum(rest)] as [string, number]] : [])];
   const max = Math.max(...rows.map(([, v]) => Math.abs(v)));
 
   return (

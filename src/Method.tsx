@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import type { Db } from "./lib";
+import { useMemo, type ReactNode } from "react";
+import { featureLabel, money, type Db } from "./lib";
 import { SectionHead } from "./ui";
 
 const Ref = ({ to, id }: { to: string; id: string }) => (
@@ -11,6 +11,53 @@ function Fact({ term, children }: { term: string; children: ReactNode }) {
     <div>
       <dt className="font-semibold">{term}</dt>
       <dd className="mt-1 text-[0.9375rem] text-ink-2">{children}</dd>
+    </div>
+  );
+}
+
+// How much each stat moves predictions on average: the mean size of its SHAP value over every
+// player-season, scaled to the latest season's tax threshold so old seasons count the same.
+function Importance({ db }: { db: Db }) {
+  const seasons = db.manifest.seasons;
+  const latest = seasons[seasons.length - 1];
+  const panels = useMemo(() => db.manifest.models.flatMap((m) => (["H", "P"] as const).map((role) => {
+    const total = new Map<string, number>();
+    let n = 0;
+    for (const s of seasons)
+      for (const r of db.recs(s.season, m.id)) {
+        if (r.role !== role) continue;
+        n++;
+        for (const [k, v] of r.why) total.set(k, (total.get(k) ?? 0) + (Math.abs(v) / s.cap) * latest.cap);
+      }
+    const rows = [...total].map(([k, v]): [string, number] => [featureLabel(k), v / n]).sort((a, b) => b[1] - a[1]);
+    return { title: `${m.label}, ${role === "H" ? "hitters" : "pitchers"}`, rows };
+  })), [db, seasons, latest]);
+  const max = Math.max(...panels.flatMap((p) => p.rows.map(([, v]) => v)));
+
+  return (
+    <div className="mt-7 border-t border-line pt-[22px]">
+      <h3 className="text-[1.625rem] font-bold">What the models value</h3>
+      <p className="mt-1 max-w-[62ch] text-ink-2">
+        How far each stat moves a prediction up or down, on average across every player-season, in {latest.label} dollars.
+        Bars share one scale across all four panels.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-x-7 gap-y-5 max-[760px]:grid-cols-1">
+        {panels.map((p) => (
+          <section key={p.title} aria-label={p.title}>
+            <h4 className="text-sm font-semibold">{p.title}</h4>
+            {/* Fixed label and value columns, so every panel's bars get the same track and the shared scale holds */}
+            <dl className="mt-2 grid grid-cols-[9.5rem_1fr_3.5rem] items-center gap-x-3 gap-y-1.5 text-sm tabular-nums">
+              {p.rows.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-ink-2">{k}</dt>
+                  <dd aria-hidden><span className="block h-2.5 rounded-r-sm bg-ink-2" style={{ width: `${(v / max) * 100}%` }} /></dd>
+                  <dd className="text-right">{money(v)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -49,6 +96,8 @@ export function Method({ db }: { db: Db }) {
           on each player card.
         </>)}
       </div>
+
+      <Importance db={db} />
 
       <dl className="mt-7 grid grid-cols-3 gap-x-7 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1 gap-y-[18px] border-t border-line pt-[22px]">
         <Fact term="Data">

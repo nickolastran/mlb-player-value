@@ -3,7 +3,7 @@ import { motion, MotionConfig } from "motion/react";
 import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type Rec, type SortDir, type SortKey, type Unit } from "./lib";
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
-import { PlayerCard } from "./PlayerCard";
+import { PlayerCard, WhyGap } from "./PlayerCard";
 import { Leaderboard } from "./Leaderboard";
 import { Scatters, TeamBars, TeamTrend } from "./Charts";
 import { Method } from "./Method";
@@ -388,6 +388,9 @@ function Explorer({ db }: { db: Db }) {
               </div>
             )}
           </div>
+          {s.player && s.vs && s.cardSeason != null && s.vsSeason != null && (
+            <WhyGap db={db} model={s.model} a={[s.player, s.cardSeason]} b={[s.vs, s.vsSeason]} />
+          )}
           {comparing && <div className="mt-5">{board(false)}</div>}
         </motion.section>
 

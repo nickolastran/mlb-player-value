@@ -227,23 +227,72 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
 
 const TOP = 5;
 
+const sum = (xs: [string, number][]) => xs.reduce((a, [, v]) => a + v, 0);
+
 // SHAP breakdown: the role's average prediction, plus what each stat added or took off.
 function Why({ r, label }: { r: Rec; label: string }) {
-  const sum = (xs: [string, number][]) => xs.reduce((a, [, v]) => a + v, 0);
-  const rest = r.why.slice(TOP);
-  const rows: [string, number][] = [...r.why.slice(0, TOP).map(([k, v]): [string, number] => [featureLabel(k), v]), ...(rest.length ? [["Other stats", sum(rest)] as [string, number]] : [])];
-  const max = Math.max(...rows.map(([, v]) => Math.abs(v)));
+  const role = r.role === "H" ? "hitter" : "pitcher";
+  return (
+    <Breakdown
+      title="Why this prediction"
+      intro={`What each stat added to or took off the ${label.toLowerCase()} model's prediction, starting from the average ${role}.`}
+      start={[`Average ${role}`, r.pred - sum(r.why)]}
+      parts={r.why}
+      end={["Prediction", r.pred]}
+    />
+  );
+}
+
+// Compare mode: the same breakdown, run on the difference between two predictions, lower to higher.
+export function WhyGap({ db, model, a, b }: { db: Db; model: ModelId; a: [string, number]; b: [string, number] }) {
+  const name = ([id, s]: [string, number]) => `${db.players.get(id)!.name}, ${db.label(s)}`;
+  let [lo, hi] = [a, b], [rl, rh] = [db.find(a[1], model, a[0])!, db.find(b[1], model, b[0])!];
+  if (rl.pred > rh.pred) [lo, hi, rl, rh] = [hi, lo, rh, rl];
+  const box = "mt-5 rounded-xl border border-line bg-panel px-5 py-4";
+  if (rl.role !== rh.role)
+    return (
+      <p className={`${box} text-ink-2`}>
+        Hitters and pitchers are priced by separate models on different stats, so the gap between them can't be split stat by stat.
+      </p>
+    );
+  const other = new Map(rl.why);
+  const parts: [string, number][] = rh.why.map(([k, v]) => [k, v - (other.get(k) ?? 0)]);
+  // The average differs only between seasons, through the tax threshold (plus a few $K of rounding).
+  parts.push(["Season's tax threshold", rh.pred - sum(rh.why) - (rl.pred - sum(rl.why))]);
+  return (
+    <Breakdown
+      className={box}
+      title="Why the gap"
+      intro={`What each stat adds or takes off, going from the lower ${db.model(model).label.toLowerCase()} prediction to the higher one.`}
+      start={[name(lo), rl.pred]}
+      parts={parts}
+      end={[name(hi), rh.pred]}
+    />
+  );
+}
+
+// A starting value, the parts that move it (the biggest few, the rest folded together) and where it ends up.
+function Breakdown({ title, intro, start, parts, end, className = "mt-3.5 rounded-lg border border-line px-3.5 py-3" }: {
+  title: string;
+  intro: string;
+  start: [string, number];
+  parts: [string, number][];
+  end: [string, number];
+  className?: string;
+}) {
+  const sorted = [...parts].sort((x, y) => Math.abs(y[1]) - Math.abs(x[1]));
+  const rest = sorted.slice(TOP);
+  const rows: [string, number][] = [...sorted.slice(0, TOP).map(([k, v]): [string, number] => [featureLabel(k), v]), ...(rest.length ? [["Other stats", sum(rest)] as [string, number]] : [])];
+  const max = Math.max(...rows.map(([, v]) => Math.abs(v))) || 1; // all zero when a season is compared with itself
 
   return (
-    <section aria-label="Why this prediction" className="mt-3.5 rounded-lg border border-line px-3.5 py-3">
-      <h4 className="font-semibold">Why this prediction</h4>
-      <p className="mt-1 text-sm text-ink-2">
-        What each stat added to or took off the {label.toLowerCase()} model's prediction, starting from the average {r.role === "H" ? "hitter" : "pitcher"}.
-      </p>
+    <section aria-label={title} className={className}>
+      <h4 className="font-semibold">{title}</h4>
+      <p className="mt-1 text-sm text-ink-2">{intro}</p>
       <dl className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 text-sm tabular-nums">
-        <dt className="text-ink-2">Average {r.role === "H" ? "hitter" : "pitcher"}</dt>
+        <dt className="text-ink-2">{start[0]}</dt>
         <dd />
-        <dd className="text-right">{usd(r.pred - sum(r.why))}</dd>
+        <dd className="text-right">{usd(start[1])}</dd>
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt>{k}</dt>
@@ -257,9 +306,9 @@ function Why({ r, label }: { r: Rec; label: string }) {
           </div>
         ))}
         <div aria-hidden className="col-span-3 border-t border-line" />
-        <dt className="font-semibold">Prediction</dt>
+        <dt className="font-semibold">{end[0]}</dt>
         <dd />
-        <dd className="text-right font-semibold">{usd(r.pred)}</dd>
+        <dd className="text-right font-semibold">{usd(end[1])}</dd>
       </dl>
     </section>
   );

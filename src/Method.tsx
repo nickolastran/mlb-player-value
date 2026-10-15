@@ -63,8 +63,12 @@ export function Method({ db }: { db: Db }) {
           season. Two-way players count as hitters, with their pitching WAR added in.
         </Fact>
         <Fact term="Stats used">
-          Hitters: games, PA, WAR, HR, SB, AVG, OBP, SLG, OPS+. Pitchers: games, starts, innings, WAR, saves, ERA, ERA+, FIP, WHIP,
-          strikeouts.
+          Hitters: games, PA, WAR, HR, SB, AVG, OBP, SLG, OPS+, position. Pitchers: games, starts, innings, WAR, saves, ERA, ERA+,
+          FIP, WHIP, strikeouts. The market model adds age, service time, last season's WAR and total WAR over the last five.
+        </Fact>
+        <Fact term="80% range">
+          Each forest is 400 trees, each with its own guess. The range is the middle 80% of those guesses, stretched so that 80% of
+          held-out salaries land inside it (the raw spread caught only about half) and floored at the league minimum.
         </Fact>
         <Fact term="Residual">
           (Actual salary − predicted salary) ÷ that season's tax threshold. Positive means overpaid relative to the model. Surplus

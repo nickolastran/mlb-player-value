@@ -21,6 +21,8 @@ export interface Rec {
   salary_pct: number | null;
   pred: number;
   pred_pct: number;
+  pred_lo: number; // 80% range
+  pred_hi: number;
   residual_pct: number | null;
   surplus: number | null;
   surplus_pct: number | null;

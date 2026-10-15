@@ -66,9 +66,9 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
       const t = v == null ? "" : String(v);
       return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
     };
-    const head = ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Surplus", ...(tag ? ["Note"] : [])];
+    const head = ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Predicted low (80%)", "Predicted high (80%)", "Surplus", ...(tag ? ["Note"] : [])];
     const lines = [head, ...rows.map((r, i) => [
-      i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.surplus, ...(tag ? [tag(r)] : []),
+      i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.pred_lo, r.pred_hi, r.surplus, ...(tag ? [tag(r)] : []),
     ])].map((l) => l.map(esc).join(","));
     const name = [heading ?? `players ${season}`, db.model(model).short, team !== "all" && team, pos !== "all" && pos]
       .filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g, "-");

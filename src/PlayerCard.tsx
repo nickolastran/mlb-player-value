@@ -179,6 +179,7 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               >
                 <h4 className={`text-sm font-semibold transition-colors duration-300 ${on ? "text-chalk" : "text-ink-2"}`}>{m.label} predicts</h4>
                 <Tween value={r.pred} format={usd} className="mt-1.5 block text-[1.625rem] font-bold leading-[1.1] tabular-nums" />
+                <p className="mt-0.5 text-sm text-ink-2 tabular-nums">80% range {usd(r.pred_lo)}–{usd(r.pred_hi)}</p>
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5 text-sm [&_dd]:whitespace-nowrap">
                   <dt className="text-muted">Share of CBT</dt>
                   <dd className="text-right tabular-nums"><Tween value={r.pred_pct} format={share} /></dd>

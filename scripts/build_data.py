@@ -18,6 +18,10 @@ salary as a share of that season's luxury-tax (CBT) threshold:
 Seasons before the latest are split 80/20 into train/test. The latest season
 is never trained on, so it's fully out-of-sample.
 
+Ranges: the 10th-90th percentile of the 400 trees' guesses, stretched around the
+prediction so 80% of test-set salaries fall inside (the raw tree spread only covers
+about half), and floored at the season's lowest salary.
+
 Why: each prediction split into per-stat contributions with SHAP (TreeExplainer,
 exact for random forests). They sum, with the role's average prediction, to the prediction.
 
@@ -89,7 +93,7 @@ def num(value, digits: int | None = None):
 
 
 def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
-    """Adds pred_<model> and why_<model> columns (share of CBT) and a split column; returns test R² per model."""
+    """Adds pred_<model>, lo_<model>, hi_<model> and why_<model> columns (share of CBT) and a split column; returns test R² per model."""
     latest = df["Season"].max()
     df["split"] = "projection"
     # Train and score only on salaries Baseball-Reference lists, not our pre-arb estimates.
@@ -109,6 +113,16 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
             rf = RandomForestRegressor(n_estimators=400, min_samples_leaf=10, random_state=42, n_jobs=-1)
             rf.fit(df.loc[fit, cols], df.loc[fit, "share"])
             df.loc[rows, f"pred_{model}"] = rf.predict(df.loc[rows, cols])
+            trees = np.stack([t.predict(df.loc[rows, cols].to_numpy()) for t in rf.estimators_])
+            pred, (lo, hi) = trees.mean(0), np.percentile(trees, [10, 90], axis=0)
+            # The stretch each test row needs to fall inside its range; take the one that covers 80%.
+            # ponytail: one stretch per model and role, calibrated on the test set; a quantile
+            # regression forest would give ranges that fit each player's neighbourhood instead.
+            t = df.index[rows].isin(te)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                need = np.maximum((pred - df.loc[rows, "share"]) / (pred - lo), (df.loc[rows, "share"] - pred) / (hi - pred))
+            k = np.nanquantile(need[t], 0.8)
+            df.loc[rows, f"lo_{model}"], df.loc[rows, f"hi_{model}"] = pred - k * (pred - lo), pred + k * (hi - pred)
             # Checks that the contributions plus the average sum to the prediction.
             parts = shap.TreeExplainer(rf).shap_values(df.loc[rows, cols])
             df.loc[rows, f"why_{model}"] = pd.Series([dict(zip(cols, p)) for p in parts], index=df.index[rows])
@@ -144,6 +158,7 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
     cbt = CBT[season]
     rows = df[df["Season"] == season].copy()
     rows["pred"] = rows[f"pred_{model}"] * cbt
+    floor = rows["Salary"].min()  # about the league minimum
     rows["surplus"] = rows["pred"] - rows["Salary"]
     rows["surplus_rank"] = rows["surplus"].rank(ascending=False, method="min")
     rows["pred_rank"] = rows["pred"].rank(ascending=False, method="min")
@@ -157,6 +172,10 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
             "salary": num(r["Salary"]), "salary_est": bool(r["Salary_est"]),
             "salary_pct": num(r["Salary"] / cbt, 5) if paid else None,
             "pred": num(r["pred"]), "pred_pct": num(r["pred"] / cbt, 5),
+            # Rounded outward to $10K. A few skewed forests average outside their own 10-90 band,
+            # so the range is widened to always hold the prediction.
+            "pred_lo": math.floor(min(max(r[f"lo_{model}"] * cbt, floor), r["pred"]) / 1e4) * 10_000,
+            "pred_hi": math.ceil(max(r[f"hi_{model}"] * cbt, r["pred"]) / 1e4) * 10_000,
             "residual_pct": num(-r["surplus"] / cbt, 5) if paid else None,
             "surplus": num(r["surplus"]) if paid else None,
             "surplus_pct": num(r["surplus"] / cbt, 5) if paid else None,
@@ -215,6 +234,7 @@ def main() -> None:
             recs = records(df, int(season), model)
             # residual and surplus are the same gap, opposite signs
             assert all(r["surplus"] is None or abs(r["residual_pct"] + r["surplus_pct"]) < 1e-4 for r in recs)
+            assert all(r["pred_lo"] <= r["pred"] <= r["pred_hi"] for r in recs)
             (DATA_DIR / f"{season}-{model}.json").write_text(json.dumps(recs, separators=(",", ":"), ensure_ascii=False, allow_nan=False))
         seasons.append({
             "season": int(season), "label": str(season), "cap": CBT[season], "players": len(s),

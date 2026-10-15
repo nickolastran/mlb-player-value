@@ -57,5 +57,6 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **Who's included.** Hitters with 300+ PA, pitchers with 50+ IP. Two-way players count as hitters with both WARs added.
 - **Salaries.** From Baseball-Reference player pages. Pre-arbitration years it skips are estimated at the league minimum (shown as ≈, never trained on) for drafted players under 3 years of service; `python scripts/test_fill_gap.py` checks that rule. A salary listed under a team the player didn't play for (usually an option buyout) is dropped.
 - **Why this prediction.** SHAP values (TreeExplainer) split each prediction into what every stat added or took off, starting from the average hitter or pitcher.
+- **80% range.** The 10th–90th percentile of the 400 trees' guesses, stretched per model and role so 80% of test-set salaries fall inside (the raw spread covers about half), floored at the season's lowest salary.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.

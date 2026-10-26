@@ -100,7 +100,7 @@ export interface Db {
 
 export async function loadDb(): Promise<Db> {
   const getJson = async <T,>(path: string): Promise<T> => {
-    const r = await fetch(new URL(path, location.origin)); // absolute, so it works from /players too
+    const r = await fetch(new URL(import.meta.env.BASE_URL + path, location.origin)); // absolute, so it works from /players too
     if (!r.ok) throw new Error(`Couldn't load ${path} (${r.status})`);
     return r.json();
   };

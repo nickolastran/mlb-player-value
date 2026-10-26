@@ -50,7 +50,7 @@ interface State {
   vsSeason: number | null;
 }
 
-const PAGES = { home: "/", players: "/players" } as const;
+const PAGES = { home: import.meta.env.BASE_URL, players: `${import.meta.env.BASE_URL}players` } as const;
 const TITLE = "MLB Player Value";
 
 const defaultSeason = (db: Db) => db.salarySeasons.at(-1) ?? db.manifest.seasons[db.manifest.seasons.length - 1].season;

@@ -474,7 +474,7 @@ function Explorer({ db }: { db: Db }) {
           <ServiceClasses db={db} season={s.season} team={s.team} pos={s.pos} />
         </section>
 
-        <Method db={db} />
+        <Method db={db} model={s.model} />
       </main>
       )}
 

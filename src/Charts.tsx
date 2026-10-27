@@ -585,3 +585,137 @@ export function ServiceClasses({ db, season, team, pos }: { db: Db; season: numb
     </Figure>
   );
 }
+
+// ---------- Model accuracy ----------
+
+const BANDS = [
+  { label: "<$1M", max: 1e6 },
+  { label: "$1–5M", max: 5e6 },
+  { label: "$5–15M", max: 15e6 },
+  { label: "$15–25M", max: 25e6 },
+  { label: "$25M+", max: Infinity },
+];
+
+// Held-out test rows only (the 20% of 2016-2025 the models never trained on), every season pooled
+// and scaled to the latest season's tax threshold so a 2016 salary compares with a 2026 one.
+export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
+  const modelInfo = db.model(model);
+  const latest = db.manifest.seasons[db.manifest.seasons.length - 1];
+
+  const rows = useMemo(() => db.manifest.seasons.flatMap((s) => db.recs(s.season, model)
+    .filter((r) => r.split === "test" && r.salary != null)
+    .map((r) => ({ r, season: s.season, k: latest.cap / s.cap, actual: r.salary_pct! * latest.cap, pred: r.pred_pct * latest.cap }))), [db, model, latest]);
+
+  const bands = useMemo(() => BANDS.map((b, i) => {
+    const inBand = rows.filter((x) => x.actual >= (BANDS[i - 1]?.max ?? 0) && x.actual < b.max);
+    const err = inBand.map((x) => x.pred - x.actual).sort((a, b) => a - b);
+    const abs = err.map(Math.abs).sort((a, b) => a - b);
+    return {
+      ...b,
+      n: inBand.length,
+      bias: err.length ? err.reduce((a, v) => a + v, 0) / err.length : 0,
+      miss: abs.length ? abs[Math.floor(abs.length / 2)] : 0, // median absolute error
+      inside: inBand.length ? inBand.filter((x) => x.r.pred_lo <= x.r.salary! && x.r.salary! <= x.r.pred_hi).length / inBand.length : 0,
+    };
+  }), [rows]);
+
+  const scatter = useMemo(() => {
+    const max = Math.max(...rows.map((x) => Math.max(x.actual, x.pred))) / 1e6 * 1.04;
+    return {
+      data: [
+        { x: [0, max], y: [0, max], mode: "lines", line: { color: C.muted, width: 1.5, dash: "dot" }, hoverinfo: "skip", showlegend: false } as Data,
+        {
+          type: "scatter",
+          mode: "markers",
+          x: rows.map((x) => x.pred / 1e6),
+          y: rows.map((x) => x.actual / 1e6),
+          text: rows.map((x) => `<b>${escapeHtml(x.r.player)}</b>  ${escapeHtml(x.r.team)}, ${db.label(x.season)}<br>Actual <b>${money(x.r.salary)}</b>, predicted <b>${money(x.r.pred)}</b><br>Off by ${money(x.r.pred - x.r.salary!, true)}${x.k > 1.005 ? ` (${money(x.pred - x.actual, true)} in ${latest.label} dollars)` : ""}`),
+          hovertemplate: "%{text}<extra></extra>",
+          marker: { color: C.text2, size: 8, opacity: 0.55, line: { color: C.panel, width: 1 } },
+          showlegend: false,
+        } as Data,
+      ],
+      layout: baseLayout({
+        // Same range on both axes so the dotted line is a true 45° and misses read at their real size.
+        xaxis: axis(`${modelInfo.label} prediction (${latest.label} $M)`, { range: [0, max], tickformat: "$,~f", ticksuffix: "M" }),
+        yaxis: axis(`Actual salary (${latest.label} $M)`, { range: [0, max], tickformat: "$,~f", ticksuffix: "M" }),
+        annotations: [corner("Paid more than predicted", 0.01, 0.99, "left", "top"), corner("Paid less than predicted", 0.99, 0.02, "right", "bottom")],
+      }),
+    };
+  }, [db, rows, modelInfo, latest]);
+
+  const bars = useMemo(() => {
+    const y = bands.map((b) => b.bias / 1e6);
+    return {
+      data: [{
+        type: "bar",
+        x: bands.map((b) => b.label),
+        y,
+        // Blue: predicted more than paid, as with surplus elsewhere on the page; red: predicted less.
+        marker: { color: y.map((v) => (v >= 0 ? C.under : C.over)), line: { width: 0 } },
+        text: bands.map((b) => money(b.bias, true)),
+        textposition: "outside",
+        textfont: { color: C.text, size: 12 },
+        cliponaxis: false,
+        hovertext: bands.map((b) => `<b>Actual salary ${b.label}</b><br>${b.n} test player-seasons<br>Average error <b>${money(b.bias, true)}</b><br>Typical miss ${money(b.miss)}<br>${Math.round(b.inside * 100)}% inside the 80% range`),
+        hovertemplate: "%{hovertext}<extra></extra>",
+      }] as Data[],
+      layout: baseLayout({
+        xaxis: axis(`Actual salary (${latest.label} dollars)`, { showgrid: false, type: "category", tickangle: 0 }),
+        yaxis: axis("Average prediction − actual ($M)", { tickformat: "$,~f", ticksuffix: "M", zeroline: true, zerolinecolor: C.text2 }),
+        uniformtext: { mode: "hide", minsize: 11 },
+        bargap: 0.35,
+        barcornerradius: 4,
+        showlegend: false,
+      } as Partial<Layout>),
+    };
+  }, [bands, latest]);
+
+  const top = bands[bands.length - 1];
+  const cls = "h-[440px] w-full max-sm:h-[420px]";
+  return (
+    <div className="mt-7 border-t border-line pt-[22px]">
+      <h3 className="text-[1.625rem] font-bold">How far off the models are</h3>
+      <p className="mt-1 mb-4 max-w-[70ch] text-ink-2">
+        The {rows.length} held-out test player-seasons from {db.manifest.seasons[0].label} to {db.manifest.seasons[db.manifest.seasons.length - 2].label},
+        which the {modelInfo.label.toLowerCase()} model never trained on, in {latest.label} dollars. Switch models with the filter at the top of the page.
+      </p>
+      <div className="grid grid-cols-2 gap-5 max-[900px]:grid-cols-1">
+        <Figure title="Predicted vs. actual" note="Dots on the dotted line were predicted exactly. Hover a dot for the player.">
+          <Plot data={scatter.data} layout={scatter.layout} className={cls} label="Scatter plot of actual salary against predicted salary for held-out test players" />
+        </Figure>
+        <Figure
+          title="Error by salary band"
+          note={`Average of predicted minus actual. Red bands are predicted too low. Players paid ${top.label} are underestimated by ${money(-top.bias)} on average.`}
+        >
+          <Plot data={bars.data} layout={bars.layout} className={cls} label="Bar chart of average prediction error by actual salary band" />
+          <details className="px-2 pb-2 text-[0.9375rem]">
+            <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full border-collapse tabular-nums">
+                <thead>
+                  <tr className="text-left text-muted">
+                    {["Actual salary", "Players", "Average error", "Typical miss", "Inside 80% range"].map((h, i) => (
+                      <th key={h} scope="col" className={`py-1 pr-3 font-medium ${i ? "text-right" : ""}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bands.map((b) => (
+                    <tr key={b.label} className="border-t border-line">
+                      <th scope="row" className="py-1 pr-3 text-left font-medium">{b.label}</th>
+                      <td className="py-1 pr-3 text-right">{b.n}</td>
+                      <td className="py-1 pr-3 text-right">{money(b.bias, true)}</td>
+                      <td className="py-1 pr-3 text-right">{money(b.miss)}</td>
+                      <td className="py-1 pr-3 text-right">{Math.round(b.inside * 100)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </Figure>
+      </div>
+    </div>
+  );
+}

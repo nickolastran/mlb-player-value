@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
-import { featureLabel, money, type Db } from "./lib";
+import { featureLabel, money, type Db, type ModelId } from "./lib";
+import { Accuracy } from "./Charts";
 import { SectionHead } from "./ui";
 
 const Ref = ({ to, id }: { to: string; id: string }) => (
@@ -62,7 +63,7 @@ function Importance({ db }: { db: Db }) {
   );
 }
 
-export function Method({ db }: { db: Db }) {
+export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
   const seasons = db.manifest.seasons;
   const latest = seasons[seasons.length - 1];
   const r2 = (id: "market" | "production") => db.model(id).r2.toFixed(2);
@@ -106,6 +107,7 @@ export function Method({ db }: { db: Db }) {
       </div>
 
       <Importance db={db} />
+      <Accuracy db={db} model={modelId} />
 
       <dl className="mt-7 grid grid-cols-3 gap-x-7 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1 gap-y-[18px] border-t border-line pt-[22px]">
         <Fact term="Data">

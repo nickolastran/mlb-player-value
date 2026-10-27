@@ -4,7 +4,7 @@ import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type 
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
 import { PlayerCard, WhyGap } from "./PlayerCard";
-import { Leaderboard } from "./Leaderboard";
+import { CareerBoard, Leaderboard, type CareerBy } from "./Leaderboard";
 import { Scatters, TeamBars, TeamTrend } from "./Charts";
 import { Method } from "./Method";
 import { Footer } from "./Footer";
@@ -48,6 +48,8 @@ interface State {
   cardSeason: number | null;
   vs: string | null; // second player in compare mode
   vsSeason: number | null;
+  careerBy: CareerBy;
+  careerDir: SortDir;
 }
 
 const PAGES = { home: import.meta.env.BASE_URL, players: `${import.meta.env.BASE_URL}players` } as const;
@@ -75,6 +77,7 @@ function initialState(db: Db): State {
     page: location.pathname === PAGES.players || p.get("view") === "players" ? "players" : "home",
     season: defaultSeason(db),
     model: "market", team: "all", pos: "all", sortKey: "surplus", sortDir: "desc", player: null, cardSeason: null, vs: null, vsSeason: null,
+    careerBy: "career", careerDir: "desc",
   };
   const season = Number(p.get("season"));
   if (db.info(season)) s.season = season;
@@ -87,6 +90,9 @@ function initialState(db: Db): State {
   const [sk, sd] = (p.get("sort") ?? "").split("-");
   if (sk in SORTS) s.sortKey = sk as SortKey;
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
+  const [cb, cd] = (p.get("careers") ?? "").split("-");
+  if (cb === "career" || cb === "stint") s.careerBy = cb;
+  if (cd === "asc" || cd === "desc") s.careerDir = cd;
   const [cmp, vs] = (p.get("compare") ?? "").split(",");
   const id = cmp || p.get("player");
   s.player = id && db.players.has(id) ? id : topPlayer(db, s.season, s.model);
@@ -108,6 +114,7 @@ function toUrl(db: Db, s: State) {
   if (s.team !== "all") p.set("team", s.team);
   if (s.pos !== "all") p.set("pos", s.pos);
   if (s.sortKey !== "surplus" || s.sortDir !== "desc") p.set("sort", `${s.sortKey}-${s.sortDir}`);
+  if (s.careerBy !== "career" || s.careerDir !== "desc") p.set("careers", `${s.careerBy}-${s.careerDir}`);
   if (s.player && s.vs) p.set("compare", `${s.player},${s.vs}`);
   else if (s.player && s.player !== topPlayer(db, s.season, s.model)) p.set("player", s.player);
   if (s.player && s.cardSeason !== cardFor(db, s.player, s.season)) p.set("card", String(s.cardSeason));
@@ -420,6 +427,25 @@ function Explorer({ db }: { db: Db }) {
             />
           </section>
         )}
+
+        <section id="careers" aria-labelledby="careers-title" className={SECTION}>
+          <SectionHead
+            id="careers-title"
+            title="Career surplus"
+            note={`Surplus added up across every season, ${seasons[0].label} to ${latest.label}. Ignores the season filter. Pick a team to see only the years players spent there.`}
+          />
+          <CareerBoard
+            db={db}
+            model={s.model}
+            team={s.team}
+            pos={s.pos}
+            by={s.careerBy}
+            dir={s.careerDir}
+            current={s.player}
+            onView={(careerBy, careerDir) => set({ careerBy, careerDir })}
+            onPick={(id, season) => openPlayer(id, season, true)}
+          />
+        </section>
 
         <section id="charts" aria-labelledby="charts-title" className={SECTION}>
           <SectionHead

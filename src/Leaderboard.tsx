@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { inPos, money, scopeLabel, SORTS, teamLogo, type Db, type ModelId, type Rec, type SortDir, type SortKey } from "./lib";
-import { Headshot, Select, TeamLogo } from "./ui";
+import { Headshot, Segmented, Select, TeamLogo } from "./ui";
 
 const BOARD_ROWS = 17;
 
 const link = "cursor-pointer text-[0.9375rem] text-ink-2 underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-chalk";
 
 const dirText = (dir: SortDir) => (dir === "desc" ? "High to low" : "Low to high");
+
+// Saves rows as mlb-<name parts>.csv. The BOM keeps accents intact in Excel.
+function downloadCsv(name: (string | false)[], lines: unknown[][]) {
+  const esc = (v: unknown) => {
+    const t = v == null ? "" : String(v);
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + lines.map((l) => l.map(esc).join(",")).join("\n")], { type: "text/csv" }));
+  a.download = `mlb-${name.filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, fill, current, onSort, onShowAll, onPick, only, title: heading, tag }: {
   db: Db;
@@ -60,24 +73,13 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
     ? sortDir === "desc" ? "Most underpaid" : "Most overpaid"
     : `By ${SORTS[sortKey].label}, ${dirText(sortDir).toLowerCase()}`;
 
-  // Every row the filters and sort give, not just the ones shown. The BOM keeps accents intact in Excel.
-  const download = () => {
-    const esc = (v: unknown) => {
-      const t = v == null ? "" : String(v);
-      return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-    };
-    const head = ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Predicted low (80%)", "Predicted high (80%)", "Surplus", ...(tag ? ["Note"] : [])];
-    const lines = [head, ...rows.map((r, i) => [
+  // Every row the filters and sort give, not just the ones shown.
+  const download = () => downloadCsv([heading ?? `players ${season}`, db.model(model).short, team !== "all" && team, pos !== "all" && pos], [
+    ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Predicted low (80%)", "Predicted high (80%)", "Surplus", ...(tag ? ["Note"] : [])],
+    ...rows.map((r, i) => [
       i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.pred_lo, r.pred_hi, r.surplus, ...(tag ? [tag(r)] : []),
-    ])].map((l) => l.map(esc).join(","));
-    const name = [heading ?? `players ${season}`, db.model(model).short, team !== "all" && team, pos !== "all" && pos]
-      .filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv" }));
-    a.download = `mlb-${name}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+    ]),
+  ]);
 
   const clickHead = (key: SortKey) => {
     if (SORTS[key].needsSalary && !salary) return;
@@ -205,6 +207,143 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
         )}
         {rows.length > 0 && (
           <button type="button" onClick={download} className={link}>
+            Download CSV
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface Span {
+  key: string;
+  id: string;
+  player: string;
+  team: string; // the stint's team, or the last one in a career
+  first: number;
+  last: number;
+  n: number;
+  war: number;
+  salary: number;
+  pred: number;
+  surplus: number;
+}
+
+// Surplus added up over several seasons: a whole career, or each stint with one team (the closest
+// the data gets to a contract; leaving and coming back starts a new stint). Only seasons with a
+// salary count, each scaled to the latest season's tax threshold so a 2016 dollar counts as much as a 2026 one.
+export type CareerBy = "career" | "stint";
+
+export function CareerBoard({ db, model, team, pos, by, dir, current, onView, onPick }: {
+  db: Db;
+  model: ModelId;
+  team: string;
+  pos: string;
+  by: CareerBy;
+  dir: SortDir;
+  current: string | null;
+  onView: (by: CareerBy, dir: SortDir) => void;
+  onPick: (id: string, season: number) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const seasons = db.manifest.seasons;
+  const latest = seasons[seasons.length - 1];
+
+  const rows = useMemo(() => {
+    const spans = new Map<string, Span>();
+    const open = new Map<string, Span>(); // player id -> their latest span
+    for (const s of seasons)
+      for (const r of db.recs(s.season, model)) {
+        if (r.surplus_pct == null || r.salary_pct == null || !(team === "all" || r.team === team) || !inPos(r, pos)) continue;
+        let sp = open.get(r.id);
+        if (!sp || (by === "stint" && sp.team !== r.team)) {
+          sp = { key: `${r.id}|${s.season}`, id: r.id, player: r.player, team: r.team, first: s.season, last: s.season, n: 0, war: 0, salary: 0, pred: 0, surplus: 0 };
+          open.set(r.id, sp);
+          spans.set(sp.key, sp);
+        }
+        sp.team = r.team;
+        sp.last = s.season;
+        sp.n++;
+        sp.war += r.war;
+        sp.salary += r.salary_pct * latest.cap;
+        sp.pred += r.pred_pct * latest.cap;
+        sp.surplus += r.surplus_pct * latest.cap;
+      }
+    const sign = dir === "desc" ? -1 : 1;
+    return [...spans.values()].filter((sp) => sp.n >= 2).sort((a, b) => sign * (a.surplus - b.surplus));
+  }, [db, seasons, latest, model, team, pos, by, dir]);
+
+  const shown = all ? rows : rows.slice(0, BOARD_ROWS);
+  const cell = "px-2 first:pl-4 last:pr-4 whitespace-nowrap py-1.5 text-right tabular-nums";
+  const what = by === "career" ? "careers" : "stints with one team";
+
+  return (
+    <div className="flex h-full flex-col rounded-xl border border-line bg-panel pb-2.5 pt-4">
+      <div className="flex items-end gap-2.5 px-4 pb-3 max-sm:flex-wrap">
+        <h3 className="min-w-0 flex-1 self-center text-[1.0625rem] font-semibold">
+          {[`${dir === "desc" ? "Most underpaid" : "Most overpaid"} ${what}`, scopeLabel(team, pos)].filter(Boolean).join(", ")}
+        </h3>
+        <Segmented id="career-by" label="Add up" small value={by} onChange={(v) => onView(v, dir)}
+          options={[{ value: "career", label: "Career" }, { value: "stint", label: "With one team" }]} />
+        <Segmented id="career-dir" label="Show" small value={dir} onChange={(v) => onView(by, v)}
+          options={[{ value: "desc", label: "Best value" }, { value: "asc", label: "Worst value" }]} />
+      </div>
+
+      <table className="w-full border-collapse text-[0.9375rem]">
+        <thead>
+          <tr className="text-[0.8125rem] text-muted">
+            {["#", "Player", "Seasons", "WAR", "Paid", "Predicted", "Surplus"].map((l) => (
+              <th key={l} scope="col" className={`${cell} border-b border-line py-2 font-medium ${l === "Player" ? "w-full max-w-0 text-left!" : ""} ${["Seasons", "WAR", "Predicted"].includes(l) ? "max-sm:hidden" : ""}`}>
+                {l}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((sp, i) => (
+            <tr
+              key={sp.key}
+              tabIndex={0}
+              onClick={() => onPick(sp.id, sp.last)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(sp.id, sp.last); } }}
+              className={`cursor-pointer border-b border-line outline-none transition-colors hover:bg-panel-2 focus-visible:bg-panel-2 ${sp.id === current ? "bg-bulb/45" : ""}`}
+            >
+              <td className={`${cell} text-muted`}>{i + 1}</td>
+              <td className={`${cell} w-full max-w-0 text-left! ${sp.id === current ? "font-semibold" : ""}`}>
+                <span className="flex items-center gap-2.5 [&>*]:flex-none">
+                  <Headshot key={sp.id} db={db} id={sp.id} size={30} />
+                  <span title={sp.player} className="min-w-0 flex-initial! whitespace-normal sm:truncate">{sp.player}</span>
+                  <span className="max-sm:hidden">{teamLogo(sp.team) ? <TeamLogo key={sp.team} code={sp.team} size={18} /> : <span className="text-sm text-muted">{sp.team}</span>}</span>
+                </span>
+              </td>
+              <td className={`${cell} max-sm:hidden`}>{sp.first === sp.last ? sp.first : `${sp.first}–${String(sp.last).slice(2)}`} · {sp.n}</td>
+              <td className={`${cell} max-sm:hidden`}>{sp.war.toFixed(1)}</td>
+              <td className={cell}>{money(sp.salary)}</td>
+              <td className={`${cell} max-sm:hidden`}>{money(sp.pred)}</td>
+              <td className={`${cell} ${sp.surplus >= 0 ? "text-under" : "text-over"}`}>{money(sp.surplus, true)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className="mx-4 mt-auto max-w-[70ch] pt-2.5 text-[0.8125rem] text-muted">
+        Every season from {seasons[0].label} to {latest.label} with a salary on record, in {latest.label} dollars (scaled by the tax threshold).
+        At least two seasons. Seasons below {db.manifest.min_pa} PA or {db.manifest.min_ip} IP, often injured ones, aren't counted, so the worst
+        contracts look better than they were.
+      </p>
+      <div className="flex flex-wrap gap-x-5 px-4 pb-1 pt-2.5">
+        {!all && rows.length > BOARD_ROWS && (
+          <button type="button" onClick={() => setAll(true)} className={link}>Show all {rows.length} {by === "career" ? "careers" : "stints"} →</button>
+        )}
+        {rows.length > 0 && (
+          <button
+            type="button"
+            className={link}
+            onClick={() => downloadCsv([by === "career" ? "careers" : "stints", dir === "desc" ? "best" : "worst", db.model(model).short, team !== "all" && team, pos !== "all" && pos], [
+              ["Rank", "Player", "Team", "First season", "Last season", "Seasons", "WAR", `Paid (${latest.label} $)`, `Predicted (${latest.label} $)`, `Surplus (${latest.label} $)`],
+              ...rows.map((sp, i) => [i + 1, sp.player, sp.team, sp.first, sp.last, sp.n, +sp.war.toFixed(1), Math.round(sp.salary), Math.round(sp.pred), Math.round(sp.surplus)]),
+            ])}
+          >
             Download CSV
           </button>
         )}

@@ -72,6 +72,15 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.
 
+## Limitations
+
+- **Salary is what Baseball-Reference lists for the year, not the contract's value.** A front- or back-loaded deal looks underpaid in its cheap years and overpaid in its expensive ones, even though the average annual value (AAV) never changes. The model has no idea how long a contract is or how much is guaranteed.
+- **Deferred money and bonuses.** The listed figure doesn't always include signing bonuses or deferrals, so some contracts look cheaper than they are (Nick Pivetta's 2025, for one). Shohei Ohtani's 2024–2026 salary is listed as $28.2M a year. That's neither the $2M actually paid each year nor the $70M AAV before deferrals, so his surplus depends on which figure you'd pick.
+- **Injured seasons drop out.** A player-season only exists if it clears 300 PA or 50 IP, so a big contract spent mostly on the injured list never shows up as an overpay. The overpaid end of each season is incomplete, and team surplus leaves out money paid to injured players. Those seasons do still count toward the next season's `WAR_prev5`.
+- **The 80% range is calibrated on the test set.** Each model and role gets one stretch factor, chosen so exactly 80% of the 2016–2025 test salaries land inside. On those rows it covers 80–81% by construction. On 2026, which no model saw, it covers 70–78%, so read it as roughly 75%. The stretch is the same for everyone, so the range is too wide for some players and too narrow for others. A quantile regression forest would fit each player better.
+- **Past seasons are mostly in-sample.** The 2016–2025 seasons in the training set have residuals that look better than the models would manage on new data. Only `test` rows and 2026 are fair measures of error.
+- **Contract status is a snapshot.** `fa` and `fa_option` come from each player's page when it was scraped, and only describe the newest season.
+
 ## Data dictionary
 
 `public/data/<season>-<model>.json` is an array of player-seasons, sorted by predicted salary. Dollar amounts are whole dollars. `_pct` fields are a share of that season's CBT threshold (`0.1` = 10% of it), which puts different seasons on one scale. `null` means not available, usually because Baseball-Reference lists no salary.

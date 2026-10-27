@@ -67,6 +67,14 @@ export function Method({ db }: { db: Db }) {
   const latest = seasons[seasons.length - 1];
   const r2 = (id: "market" | "production") => db.model(id).r2.toFixed(2);
   const sourced = seasons.filter((s) => s.salary_source).map((s) => ` ${s.label} salaries are from ${s.salary_source}.`).join("");
+  // Share of the never-trained season's listed salaries inside the range, per model and role: [lowest, highest] %.
+  const covered = useMemo(() => {
+    const pcts = db.manifest.models.flatMap((m) => (["H", "P"] as const).map((role) => {
+      const rows = db.recs(latest.season, m.id).filter((r) => r.role === role && r.salary != null && !r.salary_est);
+      return rows.length ? (100 * rows.filter((r) => r.pred_lo <= r.salary! && r.salary! <= r.pred_hi).length) / rows.length : NaN;
+    })).filter((p) => !isNaN(p));
+    return pcts.length ? [Math.round(Math.min(...pcts)), Math.round(Math.max(...pcts))] : null;
+  }, [db, latest]);
 
   const model = (title: string, id: "market" | "production", body: ReactNode) => (
     <div className="border-t-[3px] border-line-strong pt-3.5">
@@ -118,6 +126,7 @@ export function Method({ db }: { db: Db }) {
         <Fact term="80% range">
           Each forest is 400 trees, each with its own guess. The range is the middle 80% of those guesses, stretched so that 80% of
           held-out salaries land inside it (the raw spread caught only about half) and floored at the league minimum.
+          {covered && ` On ${latest.label}, which the models never saw, it catches ${covered[0]}% to ${covered[1]}% depending on model and role.`}
         </Fact>
         <Fact term="Residual">
           (Actual salary − predicted salary) ÷ that season's tax threshold. Positive means overpaid relative to the model. Surplus

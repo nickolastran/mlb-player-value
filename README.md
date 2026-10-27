@@ -2,6 +2,10 @@
 
 What MLB players *should* earn based on their production, next to what they're actually paid, for 2016 through 2026 (2020 left out).
 
+**Live site: <https://nickolastran.github.io/mlb-player-value>**
+
+[![The site's home page: the season's best value and biggest overpay, filters, and the player lookup](docs/screenshot.png)](https://nickolastran.github.io/mlb-player-value)
+
 
 ## What's in the folder
 
@@ -12,6 +16,7 @@ What MLB players *should* earn based on their production, next to what they're a
 | `public/data/<season>-<model>.json` | One file per season and model, read by the site |
 | `public/data/seasons.json` | Seasons, models (with test R²), tax thresholds and teams |
 | `public/data/mlbam.json` | Baseball-Reference ID → MLB ID, used for player headshots |
+| `docs/screenshot.png` | The screenshot at the top of this README |
 | `scripts/scrape.py` | Downloads stats and salaries from Baseball-Reference into `player-seasons.csv` |
 | `scripts/build_data.py` | Trains the models and writes everything in `public/data/` |
 | `scripts/player_ids.py` | Maps players to MLB IDs via the Chadwick Bureau register, for headshots |

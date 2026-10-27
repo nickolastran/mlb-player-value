@@ -71,3 +71,35 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **80% range.** The 10th–90th percentile of the 400 trees' guesses, stretched per model and role so 80% of test-set salaries fall inside (the raw spread covers about half), floored at the season's lowest salary.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.
+
+## Data dictionary
+
+`public/data/<season>-<model>.json` is an array of player-seasons, sorted by predicted salary. Dollar amounts are whole dollars. `_pct` fields are a share of that season's CBT threshold (`0.1` = 10% of it), which puts different seasons on one scale. `null` means not available, usually because Baseball-Reference lists no salary.
+
+| Field | Meaning |
+|---|---|
+| `id` | Baseball-Reference player ID (`wheelza01`); `mlbam.json` maps it to an MLB ID |
+| `player`, `team` | Name and team code; for a traded player, the last team they played for |
+| `traded` | Played for more than one team that season; stats are the combined line |
+| `pos`, `role` | Primary position; `role` is `H` (hitter) or `P` (pitcher), and each role has its own model |
+| `age`, `service` | Age that season; MLB service time in years (172 days = 1 year) |
+| `g`, `war` | Games, Baseball-Reference WAR |
+| `pa` `hr` `sb` `avg` `obp` `slg` `ops_plus` | Hitters only: season batting stats |
+| `ip` `gs` `sv` `era` `era_plus` `so` `whip` | Pitchers only: season pitching stats |
+| `salary`, `salary_pct` | Actual salary that season |
+| `salary_est` | `true` if `salary` is an estimate (the league minimum for a pre-arb year Baseball-Reference skips), not a listed figure; never trained on |
+| `pred`, `pred_pct` | The model's predicted salary |
+| `pred_lo`, `pred_hi` | 80% range around `pred`, rounded outward to $10K and never below the season's lowest salary |
+| `pred_rank` | Rank by `pred` that season, 1 = highest |
+| `surplus`, `surplus_pct` | `pred − salary`; positive means underpaid relative to the model |
+| `surplus_rank` | Rank by `surplus` that season, 1 = most underpaid |
+| `residual_pct` | `(salary − pred) / CBT`, the same gap as `surplus_pct` with the opposite sign; positive means overpaid |
+| `split` | `train` or `test` (the 80/20 split of 2016–2025), `projection` for the newest season (never trained on), `null` for a past season whose salary is missing or estimated |
+| `why` | `[[feature, dollars], …]`, biggest effect first: SHAP values, what each feature added to or took off the prediction. `pred` minus their sum is the average for the role. Feature names are columns in `player-seasons.csv`, except `Pos_adj`, the positional adjustment `build_data.py` derives from `Pos` |
+| `comps` | Market files only: `[[id, season], …]`, the 5 most similar seasons by other players in other seasons with a listed salary (same stats plus age, standardized) |
+| `fa` | Newest season only: the first season the player is a free agent, from their contract status at scrape time |
+| `fa_option` | Newest season only: `team`, `player` or `mutual` if an option covers the `fa` season, else `null` |
+
+`seasons.json` lists every season (`cap` is its CBT threshold, `players` its row count, `splits` the splits present), both models with their test `r2`, all team codes, and `generated`, the date the data was built.
+
+The **Download CSV** button on the site exports the rows on screen with the same values: `Salary`, `Predicted`, `Predicted low/high (80%)` and `Surplus` are `salary`, `pred`, `pred_lo`/`pred_hi` and `surplus`.

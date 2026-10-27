@@ -482,3 +482,106 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
     </Figure>
   );
 }
+
+// ---------- Surplus by service class ----------
+
+// MLB's pay ladder: near the minimum until 3 years of service, arbitration until 6, then free agency.
+// ponytail: ignores Super Two (the top ~22% of the 2-3 year group also reach arbitration); add it if
+// the pre-arb bar needs to be exact.
+const CLASSES = [
+  { label: "Pre-arbitration", short: "Pre-arb", note: "under 3 years", has: (s: number) => s < 3 },
+  { label: "Arbitration", short: "Arbitration", note: "3 to 6 years", has: (s: number) => s >= 3 && s < 6 },
+  { label: "Free-agent eligible", short: "Free agent", note: "6+ years", has: (s: number) => s >= 6 },
+];
+
+// Both models' surplus side by side for each class. The production model doesn't know service time,
+// so the gap between its bar and the market model's is the service-time discount.
+export function ServiceClasses({ db, season, team, pos }: { db: Db; season: number; team: string; pos: string }) {
+  const reduce = useReducedMotion();
+
+  const sums = useMemo(() => db.manifest.models.map((m) => ({
+    model: m,
+    classes: CLASSES.map((c) => {
+      // A traded player's salary can't be split by team, so a one-team view leaves them out.
+      const rows = db.recs(season, m.id).filter((r) => r.salary != null && r.service != null && c.has(r.service) && inPos(r, pos)
+        && (team === "all" || (r.team === team && !r.traded)));
+      return { n: rows.length, paid: rows.reduce((a, r) => a + r.salary!, 0), pred: rows.reduce((a, r) => a + r.pred, 0), surplus: rows.reduce((a, r) => a + r.surplus!, 0) };
+    }),
+  })), [db, season, team, pos]);
+
+  const plot = useMemo(() => {
+    const x = CLASSES.map((c) => `${c.short}<br><span style="font-size:12px">${c.note}</span>`);
+    return {
+      data: sums.map(({ model, classes }): Data => ({
+        type: "bar",
+        name: `${model.label} model`,
+        x,
+        y: classes.map((v) => v.surplus / 1e6),
+        marker: { color: C[model.id], line: { color: C.panel, width: 2 } },
+        // Values on the bars, in ink, so the totals don't rest on color.
+        text: classes.map((v) => money(v.surplus, true)),
+        textposition: "outside",
+        textfont: { color: C.text, size: 12 },
+        cliponaxis: false,
+        hovertext: classes.map((v, i) => `<b>${CLASSES[i].label}, ${escapeHtml(model.label.toLowerCase())} model</b><br>${v.n} players<br>Paid ${money(v.paid)}, predicted ${money(v.pred)}<br>Surplus <b>${money(v.surplus, true)}</b>`),
+        hovertemplate: "%{hovertext}<extra></extra>",
+      } as Data)),
+      layout: baseLayout({
+        barmode: "group",
+        uniformtext: { mode: "hide", minsize: 11 }, // narrow phones drop labels that would shrink; hover and the table still have them
+        bargap: 0.3,
+        bargroupgap: 0.08,
+        barcornerradius: 4,
+        hovermode: "closest",
+        xaxis: axis("", { showgrid: false, tickangle: 0, tickfont: { color: C.text, size: 13 } }),
+        yaxis: axis(`Total surplus, ${db.label(season)} ($M)`, { tickformat: "$,~f", ticksuffix: "M", zeroline: true, zerolinecolor: C.text2 }),
+        showlegend: true,
+        legend: { orientation: "h", x: 0, xanchor: "left", y: 1.02, yanchor: "bottom", font: { size: 13, color: C.text2 }, bgcolor: "rgba(0,0,0,0)" },
+        margin: { l: 64, r: 16, t: 36, b: 56 },
+        transition: reduce ? undefined : { duration: 500, easing: "cubic-in-out" },
+      } as Partial<Layout>),
+    };
+  }, [db, season, sums, reduce]);
+
+  const [prod, market] = ["production", "market"].map((id) => sums.find((s) => s.model.id === id)!.classes);
+  const discount = prod[0].surplus - market[0].surplus;
+  const scope = scopeLabel(team, pos);
+  const cls = "h-[440px] w-full max-sm:h-[420px]";
+  return (
+    <Figure
+      title={`Surplus by service class, ${db.label(season)}${scope ? `, ${scope}` : ""}`}
+      note={`Predicted minus actual salary, summed for each stage of MLB's pay ladder. The production model prices stats alone, so young players look like huge bargains to it; the market model knows the rules that keep them cheap. The gap between the two bars is the service-time discount${db.hasSalary(season) && prod[0].n ? `: ${money(discount)} for pre-arbitration players this season` : ""}.${team === "all" ? "" : " Traded players are left out."}`}
+    >
+      {db.hasSalary(season) && sums.some((s) => s.classes.some((c) => c.n))
+        ? <Plot data={plot.data} layout={plot.layout} className={cls} label="Grouped bar chart of total surplus by service class under each model" />
+        : <Empty message={db.hasSalary(season) ? "No qualifying players match these filters." : `${db.label(season)} doesn't have actual salaries in the data yet. Pick an earlier season.`} className={cls} />}
+      <details className="px-2 pb-2 text-[0.9375rem]">
+        <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full border-collapse tabular-nums">
+            <thead>
+              <tr className="text-left text-muted">
+                <th scope="col" className="py-1 pr-3 font-medium">Service class</th>
+                <th scope="col" className="py-1 pr-3 text-right font-medium">Players</th>
+                <th scope="col" className="py-1 pr-3 text-right font-medium">Paid</th>
+                {sums.map((s) => <th key={s.model.id} scope="col" className="py-1 pr-3 text-right font-medium">{s.model.short} surplus</th>)}
+                <th scope="col" className="py-1 text-right font-medium">Service-time discount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CLASSES.map((c, i) => (
+                <tr key={c.label} className="border-t border-line">
+                  <th scope="row" className="py-1 pr-3 text-left font-medium">{c.label} <span className="font-normal text-muted">({c.note})</span></th>
+                  <td className="py-1 pr-3 text-right">{prod[i].n}</td>
+                  <td className="py-1 pr-3 text-right">{money(prod[i].paid)}</td>
+                  {sums.map((s) => <td key={s.model.id} className="py-1 pr-3 text-right">{money(s.classes[i].surplus, true)}</td>)}
+                  <td className="py-1 text-right font-semibold">{money(prod[i].surplus - market[i].surplus, true)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </Figure>
+  );
+}

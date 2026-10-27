@@ -5,7 +5,7 @@ import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from 
 import { Search } from "./Search";
 import { PlayerCard, WhyGap } from "./PlayerCard";
 import { CareerBoard, Leaderboard, type CareerBy } from "./Leaderboard";
-import { Scatters, TeamBars, TeamTrend } from "./Charts";
+import { Scatters, ServiceClasses, TeamBars, TeamTrend } from "./Charts";
 import { Method } from "./Method";
 import { Footer } from "./Footer";
 
@@ -471,6 +471,7 @@ function Explorer({ db }: { db: Db }) {
           <SectionHead id="teams-title" title="Team surplus" />
           <TeamBars db={db} season={s.season} model={s.model} team={s.team} pos={s.pos} />
           <TeamTrend db={db} season={s.season} model={s.model} team={s.team} pos={s.pos} />
+          <ServiceClasses db={db} season={s.season} team={s.team} pos={s.pos} />
         </section>
 
         <Method db={db} />

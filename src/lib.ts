@@ -227,6 +227,9 @@ export const C = {
   accent: "#f5dd3b", // highlighter: fills only
   under: "#1f5fbf",
   over: "#bb3027",
+  // One per model when both share a chart; clear of under/over so identity never reads as polarity.
+  market: "#6250d6",
+  production: "#008300",
 };
 export const FONT = '"Libre Franklin", "Franklin Gothic", system-ui, -apple-system, "Segoe UI", sans-serif';
 

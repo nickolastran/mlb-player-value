@@ -31,7 +31,7 @@ python scripts/player_ids.py   # seconds; only needed when new players appear
 ### Adding a season
 
 1. Add it to `SEASONS` in `scripts/scrape.py` and its tax threshold to `CBT` in `scripts/build_data.py`.
-2. Run the three scripts, commit `player-seasons.csv` and `public/data/`, push.
+2. Run the three scripts, commit `player-seasons.csv` and `public/data/`, push, then `npm run deploy`.
 
 The newest season is always held out of training, so it's shown as fully out-of-sample.
 
@@ -46,7 +46,13 @@ npm run dev   # then open http://localhost:5173
 
 ## Deploying
 
-Import the repo on Vercel with the defaults; it detects Vite, runs `npm run build` and serves `dist/`. The CSV and scripts stay out of the deployment.
+The site is on GitHub Pages at <https://nickolastran.github.io/mlb-player-value>.
+
+```bash
+npm run deploy
+```
+
+This builds with the `/mlb-player-value/` base path, copies `index.html` to `404.html` so `/players` loads the app instead of a 404, and pushes `dist/` to the `gh-pages` branch, which Pages serves (Settings → Pages → Deploy from branch `gh-pages`). The CSV and scripts stay out of the deployment.
 
 Player headshots and team logos load from MLB's image servers (`img.mlbstatic.com`, `www.mlbstatic.com`) and belong to MLB; fine for a non-commercial project, but check MLB's terms before using them commercially.
 

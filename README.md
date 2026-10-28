@@ -71,6 +71,7 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **80% range.** The 10th–90th percentile of the 400 trees' guesses, stretched per model and role so 80% of test-set salaries fall inside (the raw spread covers about half), floored at the season's lowest salary.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.
+- **Next contract.** For upcoming free agents, the prediction times one year of aging. The aging factor is a straight line fit to how production value changes between a player's back-to-back seasons at each age (about +5% at 27, −3% at 32, −9% at 36), in the newest season's dollars.
 
 ## Limitations
 
@@ -79,6 +80,7 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **Injured seasons drop out.** A player-season only exists if it clears 300 PA or 50 IP, so a big contract spent mostly on the injured list never shows up as an overpay. The overpaid end of each season is incomplete, and team surplus leaves out money paid to injured players. Those seasons do still count toward the next season's `WAR_prev5`.
 - **The 80% range is calibrated on the test set.** Each model and role gets one stretch factor, chosen so exactly 80% of the 2016–2025 test salaries land inside. On those rows it covers 80–81% by construction. On 2026, which no model saw, it covers 70–78%, so read it as roughly 75%. The stretch is the same for everyone, so the range is too wide for some players and too narrow for others. A quantile regression forest would fit each player better.
 - **Past seasons are mostly in-sample.** The 2016–2025 seasons in the training set have residuals that look better than the models would manage on new data. Only `test` rows and 2026 are fair measures of error.
+- **The aging line is optimistic for older players.** It only learns from players who qualify in both seasons, so the ones who decline out of the data don't pull it down. It's also one year of aging applied to a multi-year deal, so read `next` as a first-year value rather than the average over the contract.
 - **Contract status is a snapshot.** `fa` and `fa_option` come from each player's page when it was scraped, and only describe the newest season.
 
 ## Data dictionary
@@ -108,6 +110,7 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 | `comps` | Market files only: `[[id, season], …]`, the 5 most similar seasons by other players in other seasons with a listed salary (same stats plus age, standardized) |
 | `fa` | Newest season only: the first season the player is a free agent, from their contract status at scrape time |
 | `fa_option` | Newest season only: `team`, `player` or `mutual` if an option covers the `fa` season, else `null` |
+| `next` | Newest season only, with `fa`: estimated yearly value of the next contract, `pred` aged one year and rounded to $10K |
 
 `seasons.json` lists every season (`cap` is its CBT threshold, `players` its row count, `splits` the splits present), both models with their test `r2`, all team codes, and `generated`, the date the data was built.
 

@@ -2,7 +2,7 @@
 
 export type ModelId = "market" | "production";
 export type Unit = "usd" | "pct";
-export type SortKey = "surplus" | "pred" | "salary" | "war" | "age";
+export type SortKey = "surplus" | "pred" | "salary" | "war" | "age" | "next";
 export type SortDir = "asc" | "desc";
 
 export interface Rec {
@@ -32,6 +32,7 @@ export interface Rec {
   // Contract status as of the scrape, newest season only
   fa?: number | null; // first free-agent season
   fa_option?: "team" | "player" | "mutual" | null; // an option covering that season
+  next?: number; // pred aged one year: an estimate of the next contract's yearly value
   why: [string, number][]; // [model feature, dollars it adds to the prediction], biggest first; the rest is the role average
   comps?: [string, number][]; // [id, season] of the most similar paid seasons by other players; market file only
   // Hitters
@@ -300,4 +301,5 @@ export const SORTS: Record<SortKey, { label: string; natural: SortDir; needsSala
   salary: { label: "actual salary", natural: "desc", needsSalary: true, get: (r) => r.salary },
   war: { label: "WAR", natural: "desc", get: (r) => r.war },
   age: { label: "age", natural: "asc", get: (r) => r.age },
+  next: { label: "next contract", natural: "desc", get: (r) => r.next ?? null }, // free-agent board only
 };

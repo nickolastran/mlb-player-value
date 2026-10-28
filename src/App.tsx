@@ -88,7 +88,7 @@ function initialState(db: Db): State {
   const pos = p.get("pos");
   if (pos && pos in POSITIONS) s.pos = pos;
   const [sk, sd] = (p.get("sort") ?? "").split("-");
-  if (sk in SORTS) s.sortKey = sk as SortKey;
+  if (sk in SORTS && sk !== "next") s.sortKey = sk as SortKey; // next is the free-agent board's own
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
   const [cb, cd] = (p.get("careers") ?? "").split("-");
   if (cb === "career" || cb === "stint") s.careerBy = cb;
@@ -129,7 +129,7 @@ function Explorer({ db }: { db: Db }) {
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
   const [picked, setPicked] = useState<number[]>(() => (db.hasSalary(s.season) ? [s.season] : []));
   const [unit, setUnit] = useState<Unit>("usd");
-  const [faSort, setFaSort] = useState<[SortKey, SortDir]>(["pred", "desc"]);
+  const [faSort, setFaSort] = useState<[SortKey, SortDir]>(["next", "desc"]);
   const [faAll, setFaAll] = useState(false);
   const [picking, setPicking] = useState(false);
   const comparing = picking || s.vs != null;
@@ -406,7 +406,7 @@ function Explorer({ db }: { db: Db }) {
             <SectionHead
               id="fa-title"
               title="Free-agent watch"
-              note={`Players whose contracts run out after ${db.label(s.season)}, per Baseball-Reference. Predicted is what the model says this season was worth, a rough guide to the next contract. An option for ${faYear} can keep a player off the market.`}
+              note={`Players whose contracts run out after ${db.label(s.season)}, per Baseball-Reference. Predicted is what the model says this season was worth. Next is that, aged one year by how production value typically changes at his age: a rough yearly value for the next contract, in ${db.label(s.season)} dollars. An option for ${faYear} can keep a player off the market.`}
             />
             <Leaderboard
               db={db}
@@ -424,6 +424,7 @@ function Explorer({ db }: { db: Db }) {
               only={isFa}
               title={`Free agents after ${db.label(s.season)}`}
               tag={(r) => r.fa_option && `${r.fa_option} option`}
+              next
             />
           </section>
         )}

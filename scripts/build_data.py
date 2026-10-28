@@ -25,6 +25,9 @@ about half), and floored at the season's lowest salary.
 Why: each prediction split into per-stat contributions with SHAP (TreeExplainer,
 exact for random forests). They sum, with the role's average prediction, to the prediction.
 
+Next contract: for players about to hit free agency, the prediction times one year of
+aging, from how production value changes between a player's back-to-back seasons by age.
+
 Comparables: each player-season's nearest neighbours on the model stats plus age
 (standardised), among other players in other seasons with a listed salary.
 
@@ -83,6 +86,7 @@ MODELS = {
 POS_ADJ = {"C": 12.5, "SS": 7.5, "2B": 2.5, "3B": 2.5, "CF": 2.5, "UT": 0, "LF": -7.5, "RF": -7.5, "1B": -12.5, "DH": -17.5}
 MIN_PA, MIN_IP = 300, 50
 N_COMPS = 5
+AGES = (24, 37)  # ages with enough back-to-back seasons to fit the aging line; others are clamped to it
 
 
 def num(value, digits: int | None = None):
@@ -131,6 +135,17 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     return df, r2
 
 
+def aging(df: pd.DataFrame) -> np.poly1d:
+    """Age -> how much a player's production value changes by the next season (1.0 = no change), as a weighted line."""
+    nxt = df[["bref_id", "Season", "pred_production"]].assign(Season=df["Season"] - 1)
+    pairs = df.merge(nxt, on=["bref_id", "Season"], suffixes=("", "_next"))
+    g = pairs.assign(Age=pairs["Age"].clip(*AGES)).groupby("Age")
+    ratio = g["pred_production_next"].sum() / g["pred_production"].sum()
+    # ponytail: only players who qualify both seasons count, so decliners who drop out are missed and the
+    # line is optimistic for older players; a survival-weighted curve (or projecting WAR) would fix that.
+    return np.poly1d(np.polyfit(ratio.index, ratio, 1, w=np.sqrt(g.size())))
+
+
 def comps(df: pd.DataFrame) -> pd.Series:
     """[[bref_id, season], ...] per row: the most similar seasons by other players in other seasons with a listed salary."""
     out = {}
@@ -154,7 +169,7 @@ def comps(df: pd.DataFrame) -> pd.Series:
     return pd.Series(out)
 
 
-def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
+def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[dict]:
     cbt = CBT[season]
     rows = df[df["Season"] == season].copy()
     rows["pred"] = rows[f"pred_{model}"] * cbt
@@ -198,7 +213,8 @@ def records(df: pd.DataFrame, season: int, model: str) -> list[dict]:
             rec["comps"] = r["comps"]
         # Contract status is as of the scrape, so it only describes the newest season.
         if season == df["Season"].max() and pd.notna(r.get("FA")):
-            rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None)
+            rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None,
+                       next=int(round(r["pred"] * grow(min(max(r["Age"], AGES[0]), AGES[1])), -4)))
         out.append(rec)
     return out
 
@@ -221,6 +237,9 @@ def main() -> None:
 
     df, r2 = train(df)
     print(f"Test R²: {r2}")
+    grow = aging(df)
+    print(f"Aging: x{grow(27):.3f} at 27, x{grow(32):.3f} at 32, x{grow(36):.3f} at 36")
+    assert grow(AGES[0]) > grow(AGES[1]), "aging line doesn't decline with age"
     df["comps"] = comps(df)
     assert df["comps"].map(len).ge(3).all(), "a player-season has fewer than 3 comparables; raise n_neighbors in comps()"
 
@@ -231,7 +250,7 @@ def main() -> None:
     for season in sorted(df["Season"].unique()):
         s = df[df["Season"] == season]
         for model in MODELS:
-            recs = records(df, int(season), model)
+            recs = records(df, int(season), model, grow)
             # residual and surplus are the same gap, opposite signs
             assert all(r["surplus"] is None or abs(r["residual_pct"] + r["surplus_pct"]) < 1e-4 for r in recs)
             assert all(r["pred_lo"] <= r["pred"] <= r["pred_hi"] for r in recs)

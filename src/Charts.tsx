@@ -98,6 +98,9 @@ function axis(title: string, extra: Record<string, unknown> = {}) {
 const corner = (text: string, x: number, y: number, xanchor: "left" | "right", yanchor: "top" | "bottom") =>
   ({ text, x, y, xref: "paper" as const, yref: "paper" as const, xanchor, yanchor, showarrow: false, font: { size: 12, color: C.muted } });
 
+// First column of a chart's data table: stays put while the numbers scroll sideways on phones.
+const STICKY = "sticky left-0 z-[1] bg-panel";
+
 function Figure({ title, note, children }: { title?: string; note?: string; children: React.ReactNode }) {
   return (
     <figure className="mb-5 rounded-xl border border-line bg-panel px-3 pb-2 pt-4">
@@ -459,10 +462,10 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
       <details className="px-2 pb-2 text-[0.9375rem]">
         <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full border-collapse tabular-nums">
+          <table className="w-full border-collapse whitespace-nowrap tabular-nums">
             <thead>
               <tr className="text-left text-muted">
-                <th scope="col" className="py-1 pr-3 font-medium">Team</th>
+                <th scope="col" className={`${STICKY} py-1 pr-3 font-medium`}>Team</th>
                 {seasons.map((s) => <th key={s.season} scope="col" className="py-1 pr-3 text-right font-medium">{s.label}</th>)}
                 <th scope="col" className="py-1 text-right font-medium">Average</th>
               </tr>
@@ -470,7 +473,10 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
             <tbody>
               {lines.map((l) => (
                 <tr key={l.team} className="border-t border-line">
-                  <th scope="row" className="py-1 pr-3 text-left font-medium">{teamName(l.team)}</th>
+                  <th scope="row" className={`${STICKY} py-1 pr-3 text-left font-medium`}>
+                    <abbr title={teamName(l.team)} className="no-underline sm:hidden">{l.team}</abbr>
+                    <span className="max-sm:hidden">{teamName(l.team)}</span>
+                  </th>
                   {l.vals.map((v, i) => <td key={i} className="py-1 pr-3 text-right">{pct(v, true)}</td>)}
                   <td className="py-1 text-right font-semibold">{pct(l.avg, true)}</td>
                 </tr>
@@ -558,10 +564,10 @@ export function ServiceClasses({ db, season, team, pos }: { db: Db; season: numb
       <details className="px-2 pb-2 text-[0.9375rem]">
         <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full border-collapse tabular-nums">
+          <table className="w-full border-collapse whitespace-nowrap tabular-nums">
             <thead>
               <tr className="text-left text-muted">
-                <th scope="col" className="py-1 pr-3 font-medium">Service class</th>
+                <th scope="col" className={`${STICKY} py-1 pr-3 font-medium`}>Service class</th>
                 <th scope="col" className="py-1 pr-3 text-right font-medium">Players</th>
                 <th scope="col" className="py-1 pr-3 text-right font-medium">Paid</th>
                 {sums.map((s) => <th key={s.model.id} scope="col" className="py-1 pr-3 text-right font-medium">{s.model.short} surplus</th>)}
@@ -571,7 +577,7 @@ export function ServiceClasses({ db, season, team, pos }: { db: Db; season: numb
             <tbody>
               {CLASSES.map((c, i) => (
                 <tr key={c.label} className="border-t border-line">
-                  <th scope="row" className="py-1 pr-3 text-left font-medium">{c.label} <span className="font-normal text-muted">({c.note})</span></th>
+                  <th scope="row" className={`${STICKY} py-1 pr-3 text-left font-medium`}>{c.label} <span className="block font-normal text-muted">{c.note}</span></th>
                   <td className="py-1 pr-3 text-right">{prod[i].n}</td>
                   <td className="py-1 pr-3 text-right">{money(prod[i].paid)}</td>
                   {sums.map((s) => <td key={s.model.id} className="py-1 pr-3 text-right">{money(s.classes[i].surplus, true)}</td>)}
@@ -692,18 +698,18 @@ export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
           <details className="px-2 pb-2 text-[0.9375rem]">
             <summary className="cursor-pointer text-ink-2 hover:text-chalk">Show as a table</summary>
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full border-collapse tabular-nums">
+              <table className="w-full border-collapse whitespace-nowrap tabular-nums">
                 <thead>
                   <tr className="text-left text-muted">
                     {["Actual salary", "Players", "Average error", "Typical miss", "Inside 80% range"].map((h, i) => (
-                      <th key={h} scope="col" className={`py-1 pr-3 font-medium ${i ? "text-right" : ""}`}>{h}</th>
+                      <th key={h} scope="col" className={`py-1 pr-3 font-medium ${i ? "text-right" : STICKY}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {bands.map((b) => (
                     <tr key={b.label} className="border-t border-line">
-                      <th scope="row" className="py-1 pr-3 text-left font-medium">{b.label}</th>
+                      <th scope="row" className={`${STICKY} py-1 pr-3 text-left font-medium`}>{b.label}</th>
                       <td className="py-1 pr-3 text-right">{b.n}</td>
                       <td className="py-1 pr-3 text-right">{money(b.bias, true)}</td>
                       <td className="py-1 pr-3 text-right">{money(b.miss)}</td>

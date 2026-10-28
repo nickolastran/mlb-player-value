@@ -361,7 +361,7 @@ function Explorer({ db }: { db: Db }) {
                 }}
                 className="h-12 flex-none cursor-pointer rounded-xl border border-line-strong bg-panel px-4 font-semibold text-ink-2 transition-colors hover:border-ink-2 hover:text-chalk"
               >
-                {comparing ? "Done comparing" : "Compare"}
+                {comparing ? <>Done<span className="max-sm:hidden"> comparing</span></> : "Compare"}
               </button>
             )}
           </div>
@@ -374,6 +374,7 @@ function Explorer({ db }: { db: Db }) {
                 season={s.season}
                 model={s.model}
                 onCardSeason={(cardSeason) => set({ cardSeason })}
+                compare={comparing}
               />
             </div>
             {comparing ? (
@@ -385,6 +386,7 @@ function Explorer({ db }: { db: Db }) {
                   season={s.season}
                   model={s.model}
                   onCardSeason={(vsSeason) => set({ vsSeason })}
+                  compare
                 />
               </div>
             ) : (

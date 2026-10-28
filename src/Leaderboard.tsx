@@ -116,7 +116,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
           <Select small label="Sort by" value={sortKey} onChange={(v) => onSort(v as SortKey, SORTS[v as SortKey].natural)}>
             {(Object.keys(SORTS) as SortKey[]).filter((k) => next || k !== "next").map((k) => (
               <option key={k} value={k} disabled={!salary && SORTS[k].needsSalary}>
-                {k === "surplus" ? "Surplus (predicted − actual)" : SORTS[k].label[0].toUpperCase() + SORTS[k].label.slice(1)}
+                {k === "surplus" ? "Surplus" : SORTS[k].label[0].toUpperCase() + SORTS[k].label.slice(1)}
               </option>
             ))}
           </Select>

@@ -8,13 +8,14 @@ const usdSigned = (v: number) => money(v, true);
 const share = (v: number) => pct(v);
 
 // The broadcast stat graphic: team stripe, name, stat line, then the money.
-export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeason }: {
+export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeason, compare }: {
   db: Db;
   playerId: string | null;
   cardSeason: number | null;
   season: number;
   model: ModelId;
   onCardSeason: (s: number) => void;
+  compare?: boolean; // one of two cards side by side
 }) {
   const player = playerId ? db.players.get(playerId) : undefined;
   if (!player || cardSeason == null) {
@@ -45,6 +46,15 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
     : [[base.ip, "IP"], [base.era?.toFixed(2), "ERA"], [base.so, "Strikeouts"], [base.pos === "RP" ? base.sv : base.gs, base.pos === "RP" ? "Saves" : "Starts"], [base.war, "WAR"]];
 
   const gap = rec.production.pred - rec.market.pred;
+  const details = (
+    <>
+      <Why r={rec[model]} label={db.model(model).label} />
+      {base.comps && base.comps.length > 0 && <Comps db={db} comps={base.comps} cardSeason={cardSeason} />}
+      {player.seasons.length > 1 && (
+        <Career key={player.id} db={db} id={player.id} seasons={player.seasons} cardSeason={cardSeason} model={model} onCardSeason={onCardSeason} />
+      )}
+    </>
+  );
 
   return (
     <article className="h-full overflow-hidden rounded-xl border border-line bg-panel" aria-live="polite">
@@ -215,11 +225,13 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               : "The market model values him above his on-field production alone, usually because free agents with six-plus years of service get paid for past performance."}
           </p>
         </div>
-        <Why r={rec[model]} label={db.model(model).label} />
-        {base.comps && base.comps.length > 0 && <Comps db={db} comps={base.comps} cardSeason={cardSeason} />}
-        {player.seasons.length > 1 && (
-          <Career key={player.id} db={db} id={player.id} seasons={player.seasons} cardSeason={cardSeason} model={model} onCardSeason={onCardSeason} />
-        )}
+        {compare ? (
+          // Stacked on phones, two full cards bury the second player's numbers, so the extras start closed there.
+          <details open={!matchMedia("(max-width: 900px)").matches} className="mt-3.5">
+            <summary className="cursor-pointer text-[0.9375rem] text-ink-2 hover:text-chalk">Breakdown, similar players and career</summary>
+            {details}
+          </details>
+        ) : details}
       </div>
     </article>
   );

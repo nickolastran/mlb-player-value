@@ -264,6 +264,7 @@ def main() -> None:
 
     manifest = {
         "generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d"),
+        "as_of": df.loc[df["Season"] == df["Season"].max(), "As_of"].min(),  # newest season's stats download
         "min_pa": MIN_PA, "min_ip": MIN_IP,
         "seasons": seasons,
         "models": [{"id": k, "label": v["label"], "short": v["short"], "r2": r2[k], "description": v["description"]}

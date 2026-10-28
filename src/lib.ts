@@ -71,6 +71,7 @@ export interface ModelInfo {
 
 export interface Manifest {
   generated: string;
+  as_of: string; // when the newest season's stats were downloaded
   min_pa: number;
   min_ip: number;
   seasons: SeasonInfo[];

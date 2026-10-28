@@ -22,6 +22,7 @@ import html
 import re
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -57,11 +58,15 @@ POSITIONS = {"1": "P", "2": "C", "3": "1B", "4": "2B", "5": "3B", "6": "SS", "7"
 _last = 0.0
 
 
+def cache_file(path: str) -> Path:
+    return CACHE / (path.strip("/").replace("/", "_"))
+
+
 def fetch(path: str) -> str:
     """Page HTML, from cache if we have it. HTML comments are unwrapped because
     Baseball-Reference hides some tables inside them."""
     global _last
-    cached = CACHE / (path.strip("/").replace("/", "_"))
+    cached = cache_file(path)
     if cached.exists():
         return cached.read_text()
     for attempt in range(5):
@@ -219,7 +224,9 @@ def first_rows(page: str, table_id: str) -> dict[str, dict]:
 
 
 def season_rows(season: int) -> list[dict]:
-    bat = first_rows(fetch(f"/leagues/majors/{season}-standard-batting.shtml"), "players_standard_batting")
+    bat_path = f"/leagues/majors/{season}-standard-batting.shtml"
+    bat = first_rows(fetch(bat_path), "players_standard_batting")
+    as_of = date.fromtimestamp(cache_file(bat_path).stat().st_mtime).isoformat()  # when these stats were downloaded
     pit = first_rows(fetch(f"/leagues/majors/{season}-standard-pitching.shtml"), "players_standard_pitching")
     if not bat or not pit:
         raise SystemExit(f"No stats tables found for {season}; the page layout may have changed")
@@ -253,6 +260,7 @@ def season_rows(season: int) -> list[dict]:
             "IP": round(ip, 2) or None, "GS": gs if p else None, "SV": f(p.get("p_sv")),
             "ERA": f(p.get("p_earned_run_avg")), "ERA_plus": f(p.get("p_earned_run_avg_plus")),
             "FIP": f(p.get("p_fip")), "WHIP": f(p.get("p_whip")), "SO": f(p.get("p_so")),
+            "As_of": as_of,
         })
     return out
 

@@ -112,6 +112,6 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 | `fa_option` | Newest season only: `team`, `player` or `mutual` if an option covers the `fa` season, else `null` |
 | `next` | Newest season only, with `fa`: estimated yearly value of the next contract, `pred` aged one year and rounded to $10K |
 
-`seasons.json` lists every season (`cap` is its CBT threshold, `players` its row count, `splits` the splits present), both models with their test `r2`, all team codes, and `generated`, the date the data was built.
+`seasons.json` lists every season (`cap` is its CBT threshold, `players` its row count, `splits` the splits present), both models with their test `r2`, all team codes, `generated`, the date the data was built, and `as_of`, the date the newest season's stats were downloaded (shown in the site footer).
 
 The **Download CSV** button on the site exports the rows on screen with the same values: `Salary`, `Predicted`, `Predicted low/high (80%)` and `Surplus` are `salary`, `pred`, `pred_lo`/`pred_hi` and `surplus`.

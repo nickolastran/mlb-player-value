@@ -17,7 +17,7 @@ export function Footer({ db }: { db: Db }) {
         <div>
           <span>© {new Date().getFullYear()} Nickolas Tran · MLB Player Value</span>
           <p className="mt-1.5 text-[0.6875rem] text-muted/80">
-            Data: Baseball-Reference. Not affiliated with MLB. Data through {latest.label}, updated {db.manifest.generated}.
+            Data: Baseball-Reference. Not affiliated with MLB. Data through {latest.label}, as of {new Date(`${db.manifest.as_of}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

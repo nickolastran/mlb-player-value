@@ -93,7 +93,7 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
 
       <div className="grid grid-cols-2 gap-5 max-[760px]:grid-cols-1">
         {model("Market value", "market", <>
-          Random forests trained on each player's season stats and, for hitters, his position, plus his age, MLB service time and track record (last season's
+          Random forests trained on each player's season stats and, for hitters, his position and defensive WAR, plus his age, MLB service time and track record (last season's
           WAR and his total over the last five), one for hitters and one for pitchers. They predict salary as a share of that season's luxury-tax threshold. Because they know service time, they
           learn how the league actually pays: near-minimum salaries for three years, arbitration raises until six, then free
           agency, where contracts are priced on the seasons before them.<Ref to="a" id="ref-a1" />
@@ -122,7 +122,7 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
           season. Two-way players count as hitters, with their pitching WAR added in.
         </Fact>
         <Fact term="Stats used">
-          Hitters: games, PA, WAR, HR, SB, AVG, OBP, SLG, OPS+, position. Pitchers: games, starts, innings, WAR, saves, ERA, ERA+,
+          Hitters: games, PA, WAR, HR, SB, AVG, OBP, SLG, OPS+, position, defensive WAR. Pitchers: games, starts, innings, WAR, saves, ERA, ERA+,
           FIP, WHIP, strikeouts. The market model adds age, service time, last season's WAR and total WAR over the last five.
         </Fact>
         <Fact term="80% range">

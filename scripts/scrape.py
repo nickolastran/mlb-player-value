@@ -7,7 +7,7 @@ Usage (from the repo root):
 
 Per season it reads two league pages (standard batting, standard pitching),
 plus the five seasons before the first for track record (prior WAR),
-then one page per qualifying player for the salary and service-time table.
+then one page per qualifying player for the salary, service-time and fielding tables.
 Every page is cached in .cache/, so a rerun only fetches what's new. Requests
 are spaced 4 seconds apart to stay under Baseball-Reference's rate limit
 (about 20 per minute; going over blocks you for an hour).
@@ -169,6 +169,16 @@ def salaries(pid: str, played_for: dict[int, str]) -> tuple[dict[int, tuple[floa
     return out, "Drafted by" in page
 
 
+def fielding(pid: str) -> dict[int, float | None]:
+    """{year: dWAR}, the player's defensive WAR (fielding plus position) from his page.
+    A traded player's first row for a year is his season total."""
+    out: dict[int, float | None] = {}
+    for r in table_rows(fetch(f"/players/{pid[0]}/{pid}.shtml"), "players_value_batting"):
+        if re.fullmatch(r"\d{4}", r.get("year_id", "")):
+            out.setdefault(int(r["year_id"]), f(r.get("b_war_def")))
+    return out
+
+
 def contract(pid: str) -> tuple[int | None, str | None]:
     """(free-agency year, option type) from the page's current contract status.
 
@@ -296,6 +306,7 @@ def main() -> None:
         if r["Service"] is not None:
             r["Service"] = round(r["Service"], 3)
         r["FA"], r["FA_option"] = contract(r["bref_id"])  # current status, the same on every row
+        r["dWAR"] = fielding(r["bref_id"]).get(r["Season"]) if r["Role"] == "H" else None
 
     # Track record: salaries are set on past seasons. No MLB time counts as 0 WAR.
     # ponytail: 2020's 60-game WAR isn't scaled up; it moved test R² by 0.01 either way.

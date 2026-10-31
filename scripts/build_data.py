@@ -72,7 +72,7 @@ CBT = {
 }
 
 FEATURES = {
-    "H": ["G", "PA", "WAR", "HR", "SB", "BA", "OBP", "SLG", "OPS_plus", "Pos_adj"],
+    "H": ["G", "PA", "WAR", "HR", "SB", "BA", "OBP", "SLG", "OPS_plus", "Pos_adj", "dWAR"],
     "P": ["G", "GS", "IP", "WAR", "SV", "ERA", "ERA_plus", "FIP", "WHIP", "SO"],
 }
 MODELS = {
@@ -83,6 +83,7 @@ MODELS = {
 }
 # Hitter position as one number: the standard positional adjustment, runs per 162 games.
 # Harder positions score higher, so a tree can split "catcher or shortstop" vs "corner bat".
+# dWAR (Baseball-Reference's defensive WAR) is the player's own glove, scaled by playing time.
 POS_ADJ = {"C": 12.5, "SS": 7.5, "2B": 2.5, "3B": 2.5, "CF": 2.5, "UT": 0, "LF": -7.5, "RF": -7.5, "1B": -12.5, "DH": -17.5}
 MIN_PA, MIN_IP = 300, 50
 N_COMPS = 5

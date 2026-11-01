@@ -64,14 +64,14 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 ## Methodology in brief
 
 - **Market value model.** Random forests (one for hitters, one for pitchers) on season stats, WAR, hitter position (as the standard positional adjustment: C highest, DH lowest), hitter defensive WAR (Baseball-Reference's dWAR, the player's own defense plus position), age, service time and track record (last season's WAR and the last five seasons' total, from the league pages, so seasons that didn't qualify still count). Predicts salary as a share of the season's competitive balance tax threshold.
-- **Production value model.** The same without age, service time and track record. The gap between the two is the *service-time discount*: what pre-arbitration and arbitration rules save teams.
+- **Production value model.** The same without age, service time and track record, trained (and scored) only on free agents with 6+ years of service, so it learns what the open market pays for production instead of averaging in pre-arbitration minimums. The gap between the two is the *service-time discount*: what pre-arbitration and arbitration rules save teams.
 - **Who's included.** Hitters with 300+ PA, pitchers with 50+ IP. Two-way players count as hitters with both WARs added.
 - **Salaries.** From Baseball-Reference player pages. Pre-arbitration years it skips are estimated at the league minimum (shown as ≈, never trained on) for drafted players under 3 years of service; `python scripts/test_fill_gap.py` checks that rule. A salary listed under a team the player didn't play for (usually an option buyout) is dropped.
 - **Why this prediction.** SHAP values (TreeExplainer) split each prediction into what every stat added or took off, starting from the average hitter or pitcher.
 - **80% range.** The 10th–90th percentile of the 400 trees' guesses, stretched per model and role so 80% of test-set salaries fall inside (the raw spread covers about half), floored at the season's lowest salary.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
 - **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.
-- **Next contract.** For upcoming free agents, the prediction times one year of aging. The aging factor is a straight line fit to how production value changes between a player's back-to-back seasons at each age (about +5% at 27, −3% at 32, −9% at 36), in the newest season's dollars.
+- **Next contract.** For upcoming free agents, the prediction times one year of aging. The aging factor is a straight line fit to how production value changes between a player's back-to-back seasons at each age (about 0% at 27, −7% at 32, −12% at 36), in the newest season's dollars.
 
 ## Limitations
 

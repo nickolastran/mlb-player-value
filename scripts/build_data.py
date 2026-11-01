@@ -13,7 +13,9 @@ salary as a share of that season's luxury-tax (CBT) threshold:
                 the last five seasons' total). Learns how MLB actually pays:
                 near-minimum pre-arbitration deals, arbitration raises, free agency
                 contracts signed on past seasons.
-    production  stats only. Closer to pure on-field worth.
+    production  stats only, trained on free agents (6+ years of service) so it learns
+                what the open market pays for production. The gap to the market model
+                is the service-time discount.
 
 Seasons before the latest are split 80/20 into train/test. The latest season
 is never trained on, so it's fully out-of-sample.
@@ -76,10 +78,12 @@ FEATURES = {
     "P": ["G", "GS", "IP", "WAR", "SV", "ERA", "ERA_plus", "FIP", "WHIP", "SO"],
 }
 MODELS = {
-    "market": {"label": "Market value", "short": "Market", "extra": ["Age", "Service", "WAR_prev", "WAR_prev5"],
+    "market": {"label": "Market value", "short": "Market", "extra": ["Age", "Service", "WAR_prev", "WAR_prev5"], "min_service": 0,
                "description": "Knows age, service time and track record. Learns how MLB actually pays."},
-    "production": {"label": "Production value", "short": "Production", "extra": [],
-                   "description": "Stats only. Closer to pure on-field worth."},
+    # Free agents only: pre-arb and arbitration pay is capped by rule, so learning from it would
+    # teach "stats only" that a 10-WAR season is worth $13M.
+    "production": {"label": "Production value", "short": "Production", "extra": [], "min_service": 6,
+                   "description": "Stats only, learned from free agents. What the open market pays for this production."},
 }
 # Hitter position as one number: the standard positional adjustment, runs per 162 games.
 # Harder positions score higher, so a tree can split "catcher or shortstop" vs "corner bat".
@@ -111,10 +115,11 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     for model, spec in MODELS.items():
         df[f"pred_{model}"] = np.nan
         df[f"why_{model}"] = None
+        eligible = df["Service"].fillna(0) >= spec["min_service"]
         for role, cols in FEATURES.items():
             cols = cols + spec["extra"]
             rows = df["Role"] == role
-            fit = df.index.isin(tr) & rows
+            fit = df.index.isin(tr) & rows & eligible
             rf = RandomForestRegressor(n_estimators=400, min_samples_leaf=10, random_state=42, n_jobs=-1)
             rf.fit(df.loc[fit, cols], df.loc[fit, "share"])
             df.loc[rows, f"pred_{model}"] = rf.predict(df.loc[rows, cols])
@@ -123,7 +128,7 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
             # The stretch each test row needs to fall inside its range; take the one that covers 80%.
             # ponytail: one stretch per model and role, calibrated on the test set; a quantile
             # regression forest would give ranges that fit each player's neighbourhood instead.
-            t = df.index[rows].isin(te)
+            t = df.index[rows].isin(te) & eligible[rows].to_numpy()
             with np.errstate(divide="ignore", invalid="ignore"):
                 need = np.maximum((pred - df.loc[rows, "share"]) / (pred - lo), (df.loc[rows, "share"] - pred) / (hi - pred))
             k = np.nanquantile(need[t], 0.8)
@@ -131,7 +136,7 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
             # Checks that the contributions plus the average sum to the prediction.
             parts = shap.TreeExplainer(rf).shap_values(df.loc[rows, cols])
             df.loc[rows, f"why_{model}"] = pd.Series([dict(zip(cols, p)) for p in parts], index=df.index[rows])
-        test = df.index.isin(te)
+        test = df.index.isin(te) & eligible
         r2[model] = round(r2_score(df.loc[test, "share"], df.loc[test, f"pred_{model}"]), 2)
     return df, r2
 
@@ -268,7 +273,7 @@ def main() -> None:
         "as_of": df.loc[df["Season"] == df["Season"].max(), "As_of"].min(),  # newest season's stats download
         "min_pa": MIN_PA, "min_ip": MIN_IP,
         "seasons": seasons,
-        "models": [{"id": k, "label": v["label"], "short": v["short"], "r2": r2[k], "description": v["description"]}
+        "models": [{"id": k, "label": v["label"], "short": v["short"], "r2": r2[k], "min_service": v["min_service"], "description": v["description"]}
                    for k, v in MODELS.items()],
         "teams": sorted(df["Team"].dropna().unique().tolist()),
         "files": "data/{season}-{model}.json",

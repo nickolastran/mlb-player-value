@@ -67,6 +67,7 @@ export interface ModelInfo {
   label: string;
   short: string;
   r2: number;
+  min_service: number; // trained and scored only on player-seasons with at least this much service time
 }
 
 export interface Manifest {

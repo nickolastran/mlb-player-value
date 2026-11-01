@@ -99,7 +99,8 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
           agency, where contracts are priced on the seasons before them.<Ref to="a" id="ref-a1" />
         </>)}
         {model("Production value", "production", <>
-          The same models with age, service time and track record removed. They can only price what a player does on the field, so they
+          The same models with age, service time and track record removed, trained and scored only on free agents ({db.model("production").min_service}+ years of
+          service), since younger players' pay is held down by rule. They price what the open market pays for a season's production, so they
           explain much less of real salaries (most MLB contracts were signed on past seasons, not this one) but sit closer to
           pure on-field worth.<Ref to="a" id="ref-a2" /> The gap between the two predictions is the <em>service-time discount</em> shown
           on each player card.

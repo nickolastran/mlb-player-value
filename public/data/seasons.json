@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-31",
+  "generated": "2026-11-01",
   "as_of": "2026-10-02",
   "min_pa": 300,
   "min_ip": 50,
@@ -130,14 +130,16 @@
       "label": "Market value",
       "short": "Market",
       "r2": 0.73,
+      "min_service": 0,
       "description": "Knows age, service time and track record. Learns how MLB actually pays."
     },
     {
       "id": "production",
       "label": "Production value",
       "short": "Production",
-      "r2": 0.22,
-      "description": "Stats only. Closer to pure on-field worth."
+      "r2": 0.28,
+      "min_service": 6,
+      "description": "Stats only, learned from free agents. What the open market pays for this production."
     }
   ],
   "teams": [

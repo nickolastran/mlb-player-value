@@ -609,8 +609,8 @@ export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
   const latest = db.manifest.seasons[db.manifest.seasons.length - 1];
 
   const rows = useMemo(() => db.manifest.seasons.flatMap((s) => db.recs(s.season, model)
-    .filter((r) => r.split === "test" && r.salary != null)
-    .map((r) => ({ r, season: s.season, k: latest.cap / s.cap, actual: r.salary_pct! * latest.cap, pred: r.pred_pct * latest.cap }))), [db, model, latest]);
+    .filter((r) => r.split === "test" && r.salary != null && (r.service ?? 0) >= modelInfo.min_service)
+    .map((r) => ({ r, season: s.season, k: latest.cap / s.cap, actual: r.salary_pct! * latest.cap, pred: r.pred_pct * latest.cap }))), [db, model, modelInfo, latest]);
 
   const bands = useMemo(() => BANDS.map((b, i) => {
     const inBand = rows.filter((x) => x.actual >= (BANDS[i - 1]?.max ?? 0) && x.actual < b.max);
@@ -683,7 +683,7 @@ export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
     <div className="mt-7 border-t border-line pt-[22px]">
       <h3 className="text-[1.625rem] font-bold">How far off the models are</h3>
       <p className="mt-1 mb-4 max-w-[70ch] text-ink-2">
-        The {rows.length} held-out test player-seasons from {db.manifest.seasons[0].label} to {db.manifest.seasons[db.manifest.seasons.length - 2].label},
+        The {rows.length} held-out test player-seasons{modelInfo.min_service ? ` by players with ${modelInfo.min_service}+ years of service` : ""} from {db.manifest.seasons[0].label} to {db.manifest.seasons[db.manifest.seasons.length - 2].label},
         which the {modelInfo.label.toLowerCase()} model never trained on, in {latest.label} dollars. Switch models with the filter at the top of the page.
       </p>
       <div className="grid grid-cols-2 gap-5 max-[900px]:grid-cols-1">

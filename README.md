@@ -38,7 +38,7 @@ python scripts/player_ids.py   # seconds; only needed when new players appear
 1. Add it to `SEASONS` in `scripts/scrape.py` and its tax threshold to `CBT` in `scripts/build_data.py`.
 2. Run the three scripts, commit `player-seasons.csv` and `public/data/`, push, then `npm run deploy`.
 
-The newest season is always held out of training, so it's shown as fully out-of-sample.
+The newest season is never trained on, so it's shown as fully out-of-sample, and the one before it is the test season.
 
 ## Running it locally
 
@@ -70,8 +70,8 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 - **Why this prediction.** SHAP values (TreeExplainer) split each prediction into what every stat added or took off, starting from the average hitter or pitcher.
 - **80% range.** The 10th–90th percentile of the 400 trees' guesses, stretched per model and role so 80% of test-set salaries fall inside (the raw spread covers about half), floored at the season's lowest salary.
 - **Residual.** `(actual − predicted) / CBT threshold`. Positive means overpaid relative to the model.
-- **Train/test.** 80/20 random split of 2016–2025; 2026 is never trained on.
-- **Next contract.** For upcoming free agents, the prediction times one year of aging. The aging factor is a straight line fit to how production value changes between a player's back-to-back seasons at each age (about 0% at 27, −7% at 32, −12% at 36), in the newest season's dollars.
+- **Train/test.** By time: 2016–2024 trains, 2025 is the test season (R² and range calibration), 2026 is never trained on. A random 80/20 split scored higher (R² 0.74 vs 0.63 for market) because a contract's other years leak into training.
+- **Next contract.** For upcoming free agents, the prediction times one year of aging. The aging factor is a straight line fit to how production value changes between a player's back-to-back seasons at each age (about 0% at 27, −6% at 32, −11% at 36), in the newest season's dollars.
 
 ## Limitations
 
@@ -105,7 +105,7 @@ Player headshots and team logos load from MLB's image servers (`img.mlbstatic.co
 | `surplus`, `surplus_pct` | `pred − salary`; positive means underpaid relative to the model |
 | `surplus_rank` | Rank by `surplus` that season, 1 = most underpaid |
 | `residual_pct` | `(salary − pred) / CBT`, the same gap as `surplus_pct` with the opposite sign; positive means overpaid |
-| `split` | `train` or `test` (the 80/20 split of 2016–2025), `projection` for the newest season (never trained on), `null` for a past season whose salary is missing or estimated |
+| `split` | `train` (2016–2024) or `test` (2025), `projection` for the newest season (never trained on), `null` for a past season whose salary is missing or estimated |
 | `why` | `[[feature, dollars], …]`, biggest effect first: SHAP values, what each feature added to or took off the prediction. `pred` minus their sum is the average for the role. Feature names are columns in `player-seasons.csv`, except `Pos_adj`, the positional adjustment `build_data.py` derives from `Pos` |
 | `comps` | Market files only: `[[id, season], …]`, the 5 most similar seasons by other players in other seasons with a listed salary (same stats plus age, standardized) |
 | `fa` | Newest season only: the first season the player is a free agent, from their contract status at scrape time |

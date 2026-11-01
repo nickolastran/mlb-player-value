@@ -602,7 +602,7 @@ const BANDS = [
   { label: "$25M+", max: Infinity },
 ];
 
-// Held-out test rows only (the 20% of 2016-2025 the models never trained on), every season pooled
+// Held-out test rows only (the second-newest season, which the models never trained on), every season pooled
 // and scaled to the latest season's tax threshold so a 2016 salary compares with a 2026 one.
 export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
   const modelInfo = db.model(model);
@@ -683,7 +683,7 @@ export function Accuracy({ db, model }: { db: Db; model: ModelId }) {
     <div className="mt-7 border-t border-line pt-[22px]">
       <h3 className="text-[1.625rem] font-bold">How far off the models are</h3>
       <p className="mt-1 mb-4 max-w-[70ch] text-ink-2">
-        The {rows.length} held-out test player-seasons{modelInfo.min_service ? ` by players with ${modelInfo.min_service}+ years of service` : ""} from {db.manifest.seasons[0].label} to {db.manifest.seasons[db.manifest.seasons.length - 2].label},
+        The {rows.length} held-out test player-seasons{modelInfo.min_service ? ` by players with ${modelInfo.min_service}+ years of service` : ""} from {db.label(db.manifest.seasons[db.manifest.seasons.length - 2].season)},
         which the {modelInfo.label.toLowerCase()} model never trained on, in {latest.label} dollars. Switch models with the filter at the top of the page.
       </p>
       <div className="grid grid-cols-2 gap-5 max-[900px]:grid-cols-1">

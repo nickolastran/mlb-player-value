@@ -140,7 +140,8 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
           2026, so the same dollar figure means different things across seasons.
         </Fact>
         <Fact term="Train / test">
-          80% of 2016 to 2025 player-seasons trained the models; the other 20% were held out to measure the R² above. The models
+          {seasons[0].label} to {seasons[seasons.length - 3].label} trained the models; {seasons[seasons.length - 2].label} was held out to measure the R² above
+          and calibrate the ranges, so the R² is how well the models price a season they've never seen. The models
           never saw {latest.label} at all, so it's a true out-of-sample season.
           {!latest.has_salary && " Its salaries aren't in the data yet, so it shows predictions only."}
           <Ref to="b" id="ref-b" />
@@ -162,8 +163,8 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
         <li id="fn-b" className="mb-2.5 flex gap-2.5 target:text-chalk">
           <span className="w-[1ch] flex-none font-bold text-chalk">b</span>
           <span>
-            The 2016 to 2025 seasons are in-sample: the models trained on that data, so historical residuals look slightly better
-            than the models would do on new seasons. Rows marked “held-out” on a player card are the exception.{" "}
+            The {seasons[0].label} to {seasons[seasons.length - 3].label} seasons are in-sample: the models trained on that data, so historical residuals look better
+            than the models would do on new seasons. {seasons[seasons.length - 2].label} rows, marked “held-out” on a player card, are the exception.{" "}
             <a href="#ref-b" aria-label="Back to text">↩</a>
           </span>
         </li>

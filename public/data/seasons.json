@@ -12,7 +12,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -24,7 +23,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -36,7 +34,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -48,7 +45,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -60,7 +56,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -72,7 +67,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -84,7 +78,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -96,7 +89,6 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
         "train"
       ]
     },
@@ -108,8 +100,7 @@
       "has_salary": true,
       "salary_source": null,
       "splits": [
-        "test",
-        "train"
+        "test"
       ]
     },
     {
@@ -129,7 +120,7 @@
       "id": "market",
       "label": "Market value",
       "short": "Market",
-      "r2": 0.73,
+      "r2": 0.63,
       "min_service": 0,
       "description": "Knows age, service time and track record. Learns how MLB actually pays."
     },
@@ -137,7 +128,7 @@
       "id": "production",
       "label": "Production value",
       "short": "Production",
-      "r2": 0.28,
+      "r2": 0.43,
       "min_service": 6,
       "description": "Stats only, learned from free agents. What the open market pays for this production."
     }

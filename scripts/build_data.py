@@ -17,8 +17,9 @@ salary as a share of that season's luxury-tax (CBT) threshold:
                 what the open market pays for production. The gap to the market model
                 is the service-time discount.
 
-Seasons before the latest are split 80/20 into train/test. The latest season
-is never trained on, so it's fully out-of-sample.
+Split by time, the way the site is used: every season before the second-newest trains,
+the second-newest is the test season (R² and range calibration), and the newest is
+never trained on, so it's fully out-of-sample.
 
 Ranges: the 10th-90th percentile of the 400 trees' guesses, stretched around the
 prediction so 80% of test-set salaries fall inside (the raw tree spread only covers
@@ -50,7 +51,6 @@ import pandas as pd
 import shap
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
@@ -107,7 +107,10 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     df["split"] = "projection"
     # Train and score only on salaries Baseball-Reference lists, not our pre-arb estimates.
     known = df[(df["Season"] < latest) & df["Salary"].notna() & ~df["Salary_est"]].index
-    tr, te = train_test_split(known, test_size=0.2, random_state=42)
+    # By time, not at random: a random split lets a contract's other years (same player, same salary)
+    # sit in training, which flatters R² (0.74 random vs 0.63 on an unseen season).
+    test_season = df.loc[known, "Season"].max()
+    tr, te = known[df.loc[known, "Season"] < test_season], known[df.loc[known, "Season"] == test_season]
     df.loc[tr, "split"], df.loc[te, "split"] = "train", "test"
     df.loc[df["split"].eq("projection") & (df["Season"] < latest), "split"] = None  # no salary to learn from
 

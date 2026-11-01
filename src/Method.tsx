@@ -26,7 +26,7 @@ function Importance({ db }: { db: Db }) {
     let n = 0;
     for (const s of seasons)
       for (const r of db.recs(s.season, m.id)) {
-        if (r.role !== role) continue;
+        if (r.role !== role || !r.qualified) continue;
         n++;
         for (const [k, v] of r.why) total.set(k, (total.get(k) ?? 0) + (Math.abs(v) / s.cap) * latest.cap);
       }
@@ -71,7 +71,7 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
   // Share of the never-trained season's listed salaries inside the range, per model and role: [lowest, highest] %.
   const covered = useMemo(() => {
     const pcts = db.manifest.models.flatMap((m) => (["H", "P"] as const).map((role) => {
-      const rows = db.recs(latest.season, m.id).filter((r) => r.role === role && r.salary != null && !r.salary_est);
+      const rows = db.recs(latest.season, m.id).filter((r) => r.role === role && r.qualified && r.salary != null && !r.salary_est);
       return rows.length ? (100 * rows.filter((r) => r.pred_lo <= r.salary! && r.salary! <= r.pred_hi).length) / rows.length : NaN;
     })).filter((p) => !isNaN(p));
     return pcts.length ? [Math.round(Math.min(...pcts)), Math.round(Math.max(...pcts))] : null;
@@ -120,7 +120,10 @@ export function Method({ db, model: modelId }: { db: Db; model: ModelId }) {
         </Fact>
         <Fact term="Who's included">
           Hitters with at least {db.manifest.min_pa} plate appearances and pitchers with at least {db.manifest.min_ip} innings in a
-          season. Two-way players count as hitters, with their pitching WAR added in.
+          season. Two-way players count as hitters, with their pitching WAR added in. Their other seasons with a listed salary are
+          shown too, marked short season or didn't play (usually injured): priced but never trained on, with production value
+          scaled to the share of a {db.manifest.min_pa}-PA or {db.manifest.min_ip}-inning season they played, so a lost year shows
+          as the overpay it was.
         </Fact>
         <Fact term="Stats used">
           Hitters: games, PA, WAR, HR, SB, AVG, OBP, SLG, OPS+, position, defensive WAR. Pitchers: games, starts, innings, WAR, saves, ERA, ERA+,

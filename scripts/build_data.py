@@ -29,7 +29,8 @@ Why: each prediction split into per-stat contributions with SHAP (TreeExplainer,
 exact for random forests). They sum, with the role's average prediction, to the prediction.
 
 Next contract: for players about to hit free agency, the prediction times one year of
-aging, from how production value changes between a player's back-to-back seasons by age.
+aging, from how production value changes between a player's back-to-back seasons by age,
+scaled for the players who drop below the cutoff the next season.
 
 Comparables: each player-season's nearest neighbours on the model stats plus age
 (standardised), among other players in other seasons with a listed salary.
@@ -82,7 +83,7 @@ MODELS = {
                "description": "Knows age, service time and track record. Learns how MLB actually pays."},
     # Free agents only: pre-arb and arbitration pay is capped by rule, so learning from it would
     # teach "stats only" that a 10-WAR season is worth $13M.
-    "production": {"label": "Production value", "short": "Production", "extra": [], "min_service": 6,
+    "production": {"label": "Production value", "short": "Production", "extra": [], "min_service": 6, "prorate": True,
                    "description": "Stats only, learned from free agents. What the open market pays for this production."},
 }
 # Hitter position as one number: the standard positional adjustment, runs per 162 games.
@@ -106,13 +107,14 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
     latest = df["Season"].max()
     df["split"] = "projection"
     # Train and score only on salaries Baseball-Reference lists, not our pre-arb estimates.
-    known = df[(df["Season"] < latest) & df["Salary"].notna() & ~df["Salary_est"]].index
+    # Seasons under the cutoff (mostly injured) are priced but never learned from.
+    known = df[(df["Season"] < latest) & df["Salary"].notna() & ~df["Salary_est"] & df["Qualified"]].index
     # By time, not at random: a random split lets a contract's other years (same player, same salary)
     # sit in training, which flatters R² (0.74 random vs 0.63 on an unseen season).
     test_season = df.loc[known, "Season"].max()
     tr, te = known[df.loc[known, "Season"] < test_season], known[df.loc[known, "Season"] == test_season]
     df.loc[tr, "split"], df.loc[te, "split"] = "train", "test"
-    df.loc[df["split"].eq("projection") & (df["Season"] < latest), "split"] = None  # no salary to learn from
+    df.loc[df["split"].eq("projection") & ((df["Season"] < latest) | ~df["Qualified"]), "split"] = None  # nothing to learn from
 
     r2 = {}
     for model, spec in MODELS.items():
@@ -125,20 +127,30 @@ def train(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
             fit = df.index.isin(tr) & rows & eligible
             rf = RandomForestRegressor(n_estimators=400, min_samples_leaf=10, random_state=42, n_jobs=-1)
             rf.fit(df.loc[fit, cols], df.loc[fit, "share"])
-            df.loc[rows, f"pred_{model}"] = rf.predict(df.loc[rows, cols])
             trees = np.stack([t.predict(df.loc[rows, cols].to_numpy()) for t in rf.estimators_])
             pred, (lo, hi) = trees.mean(0), np.percentile(trees, [10, 90], axis=0)
             # The stretch each test row needs to fall inside its range; take the one that covers 80%.
-            # ponytail: one stretch per model and role, calibrated on the test set; a quantile
-            # regression forest would give ranges that fit each player's neighbourhood instead.
+            # One stretch per model and role, calibrated on the test set. A quantile regression forest
+            # was tried (Oct 2026): after the same stretch it matched this on 2026 coverage and width, so not worth it.
             t = df.index[rows].isin(te) & eligible[rows].to_numpy()
             with np.errstate(divide="ignore", invalid="ignore"):
                 need = np.maximum((pred - df.loc[rows, "share"]) / (pred - lo), (df.loc[rows, "share"] - pred) / (hi - pred))
             k = np.nanquantile(need[t], 0.8)
-            df.loc[rows, f"lo_{model}"], df.loc[rows, f"hi_{model}"] = pred - k * (pred - lo), pred + k * (hi - pred)
+            lo, hi = pred - k * (pred - lo), pred + k * (hi - pred)
             # Checks that the contributions plus the average sum to the prediction.
-            parts = shap.TreeExplainer(rf).shap_values(df.loc[rows, cols])
-            df.loc[rows, f"why_{model}"] = pd.Series([dict(zip(cols, p)) for p in parts], index=df.index[rows])
+            why = [dict(zip(cols, p)) for p in shap.TreeExplainer(rf).shap_values(df.loc[rows, cols])]
+            if spec.get("prorate"):
+                # Under the cutoff, production is worth the share of a season he played (1 for everyone
+                # who qualifies). The forests only know full seasons, so a 40-game line is priced as one.
+                # ponytail: its low counting stats already pull that price down, so short seasons are
+                # somewhat double-discounted; scaling counting stats up to a full season would fix it.
+                time = (df.loc[rows, "PA"] / MIN_PA if role == "H" else df.loc[rows, "IP"] / MIN_IP).fillna(0).clip(upper=1).to_numpy()
+                for w, full, f in zip(why, pred, time):
+                    if f < 1:
+                        w["Missed"] = full * (f - 1)  # keeps contributions summing to the prediction
+                pred, lo, hi = pred * time, lo * time, hi * time
+            df.loc[rows, f"pred_{model}"], df.loc[rows, f"lo_{model}"], df.loc[rows, f"hi_{model}"] = pred, lo, hi
+            df.loc[rows, f"why_{model}"] = pd.Series(why, index=df.index[rows])
         test = df.index.isin(te) & eligible
         r2[model] = round(r2_score(df.loc[test, "share"], df.loc[test, f"pred_{model}"]), 2)
     return df, r2
@@ -150,8 +162,13 @@ def aging(df: pd.DataFrame) -> np.poly1d:
     pairs = df.merge(nxt, on=["bref_id", "Season"], suffixes=("", "_next"))
     g = pairs.assign(Age=pairs["Age"].clip(*AGES)).groupby("Age")
     ratio = g["pred_production_next"].sum() / g["pred_production"].sum()
-    # ponytail: only players who qualify both seasons count, so decliners who drop out are missed and the
-    # line is optimistic for older players; a survival-weighted curve (or projecting WAR) would fix that.
+    # Value can only be compared for players who qualify both seasons, but about a third drop below
+    # the cutoff (injured, demoted, retired), more with age. Scale by how much next-season WAR
+    # everyone keeps relative to those survivors, so the line is an expected value, risk included.
+    d = df.dropna(subset=["WAR_next"])
+    d = d.assign(Age=d["Age"].clip(*AGES), survived=d.set_index(["bref_id", "Season"]).index.isin(pairs.set_index(["bref_id", "Season"]).index))
+    keep = lambda x: x.groupby("Age")["WAR_next"].sum() / x.groupby("Age")["WAR"].sum()
+    ratio = ratio * keep(d) / keep(d[d["survived"]])
     return np.poly1d(np.polyfit(ratio.index, ratio, 1, w=np.sqrt(g.size())))
 
 
@@ -159,7 +176,7 @@ def comps(df: pd.DataFrame) -> pd.Series:
     """[[bref_id, season], ...] per row: the most similar seasons by other players in other seasons with a listed salary."""
     out = {}
     for role, cols in FEATURES.items():
-        rows = df[df["Role"] == role]
+        rows = df[(df["Role"] == role) & df["Qualified"]]  # an injured season's few stats would match nobody
         X = StandardScaler().fit_transform(rows[cols + ["Age"]])
         pool = (rows["Salary"].notna() & ~rows["Salary_est"]).to_numpy()
         ids, seasons = rows["bref_id"].to_numpy()[pool], rows["Season"].to_numpy()[pool]
@@ -182,7 +199,7 @@ def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[
     cbt = CBT[season]
     rows = df[df["Season"] == season].copy()
     rows["pred"] = rows[f"pred_{model}"] * cbt
-    floor = rows["Salary"].min()  # about the league minimum
+    floor = rows.loc[rows["Qualified"], "Salary"].min()  # about the league minimum
     rows["surplus"] = rows["pred"] - rows["Salary"]
     rows["surplus_rank"] = rows["surplus"].rank(ascending=False, method="min")
     rows["pred_rank"] = rows["pred"].rank(ascending=False, method="min")
@@ -206,6 +223,7 @@ def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[
             "surplus_rank": num(r["surplus_rank"]) if paid else None,
             "pred_rank": num(r["pred_rank"]),
             "split": r["split"] if isinstance(r["split"], str) else None,
+            "qualified": bool(r["Qualified"]),
         }
         if r["Role"] == "H":
             rec.update(pa=num(r["PA"]), hr=num(r["HR"]), sb=num(r["SB"]), avg=num(r["BA"], 3),
@@ -221,7 +239,8 @@ def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[
         if model == "market":
             rec["comps"] = r["comps"]
         # Contract status is as of the scrape, so it only describes the newest season.
-        if season == df["Season"].max() and pd.notna(r.get("FA")):
+        # A next-contract value needs a real season to age, so injured ones are left off the list.
+        if season == df["Season"].max() and pd.notna(r.get("FA")) and r["Qualified"]:
             rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None,
                        next=int(round(r["pred"] * grow(min(max(r["Age"], AGES[0]), AGES[1])), -4)))
         out.append(rec)
@@ -246,11 +265,12 @@ def main() -> None:
 
     df, r2 = train(df)
     print(f"Test R²: {r2}")
-    grow = aging(df)
+    grow = aging(df[df["Qualified"]])
     print(f"Aging: x{grow(27):.3f} at 27, x{grow(32):.3f} at 32, x{grow(36):.3f} at 36")
     assert grow(AGES[0]) > grow(AGES[1]), "aging line doesn't decline with age"
     df["comps"] = comps(df)
-    assert df["comps"].map(len).ge(3).all(), "a player-season has fewer than 3 comparables; raise n_neighbors in comps()"
+    assert df.loc[df["Qualified"], "comps"].map(len).ge(3).all(), "a player-season has fewer than 3 comparables; raise n_neighbors in comps()"
+    df["comps"] = df["comps"].map(lambda c: c if isinstance(c, list) else [])
 
     DATA_DIR.mkdir(exist_ok=True)
     for old in DATA_DIR.glob("[0-9]*-*.json"):  # season files only; mlbam.json is player_ids.py's
@@ -263,6 +283,11 @@ def main() -> None:
             # residual and surplus are the same gap, opposite signs
             assert all(r["surplus"] is None or abs(r["residual_pct"] + r["surplus_pct"]) < 1e-4 for r in recs)
             assert all(r["pred_lo"] <= r["pred"] <= r["pred_hi"] for r in recs)
+            # The site reads the role average as pred minus the contributions, so it must be one number per role
+            # (each contribution is rounded to $1K, hence the slack). Breaks if "Missed" stops balancing a pro-rating.
+            for role in "HP":
+                base = [r["pred"] - sum(v for _, v in r["why"]) for r in recs if r["role"] == role]
+                assert max(base) - min(base) < 50_000, f"{season} {model} {role}: contributions don't sum to the prediction"
             (DATA_DIR / f"{season}-{model}.json").write_text(json.dumps(recs, separators=(",", ":"), ensure_ascii=False, allow_nan=False))
         seasons.append({
             "season": int(season), "label": str(season), "cap": CBT[season], "players": len(s),

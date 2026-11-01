@@ -8,6 +8,9 @@ Usage (from the repo root):
 Per season it reads two league pages (standard batting, standard pitching),
 plus the five seasons before the first for track record (prior WAR),
 then one page per qualifying player for the salary, service-time and fielding tables.
+Those players' other seasons with a listed salary are kept too (Qualified False): under
+the cutoff or not in the majors at all, usually injured, so big contracts that went
+unplayed still count as an overpay. They're never trained on.
 Every page is cached in .cache/, so a rerun only fetches what's new. Requests
 are spaced 4 seconds apart to stay under Baseball-Reference's rate limit
 (about 20 per minute; going over blocks you for an hour).
@@ -233,7 +236,8 @@ def first_rows(page: str, table_id: str) -> dict[str, dict]:
     return out
 
 
-def season_rows(season: int) -> list[dict]:
+def season_rows(season: int, roles: dict[str, str] | None = None) -> list[dict]:
+    """Qualifying player-seasons; or, given roles ({id: "H" or "P"}), those players' seasons under the cutoff."""
     bat_path = f"/leagues/majors/{season}-standard-batting.shtml"
     bat = first_rows(fetch(bat_path), "players_standard_batting")
     as_of = date.fromtimestamp(cache_file(bat_path).stat().st_mtime).isoformat()  # when these stats were downloaded
@@ -245,10 +249,11 @@ def season_rows(season: int) -> list[dict]:
     for pid in sorted(set(bat) | set(pit)):
         b, p = bat.get(pid, {}), pit.get(pid, {})
         pa, ip = f(b.get("b_pa")) or 0, innings(p.get("p_ip")) or 0
-        if pa < MIN_PA and ip < MIN_IP:
+        qualified = pa >= MIN_PA or ip >= MIN_IP
+        if qualified == (roles is not None) or (roles is not None and pid not in roles):
             continue
-        hitter = pa >= MIN_PA  # two-way players (Ohtani) count as hitters, with both WARs
-        src = b if hitter else p
+        hitter = pa >= MIN_PA if qualified else roles[pid] == "H"  # two-way players (Ohtani) count as hitters, with both WARs
+        src = (b if hitter else p) or b or p
         if not hitter:
             b = {k: v for k, v in b.items() if k == "b_war"}  # a pitcher's few at-bats aren't his stat line
         g, gs = f(p.get("p_g")) or 0, f(p.get("p_gs")) or 0
@@ -260,7 +265,8 @@ def season_rows(season: int) -> list[dict]:
             "Team": TEAM_ALIASES.get(team, team),
             "Traded": bool(re.fullmatch(r"\dTM", src.get("team_name_abbr", ""))),
             "Role": "H" if hitter else "P",
-            "Pos": main_position(b.get("pos", "")) if hitter else ("SP" if gs >= g / 2 else "RP"),
+            # A hitter listed at pitcher (a catcher who tried pitching) is a utility man here.
+            "Pos": {"P": "UT"}.get(main_position(b.get("pos", "")), main_position(b.get("pos", ""))) if hitter else ("SP" if gs >= g / 2 else "RP"),
             "Age": f(src.get("age")),
             "G": f(b.get("b_games")) if hitter else g,
             "WAR": round((f(b.get("b_war")) or 0) + (f(p.get("p_war")) or 0), 2),
@@ -271,7 +277,26 @@ def season_rows(season: int) -> list[dict]:
             "ERA": f(p.get("p_earned_run_avg")), "ERA_plus": f(p.get("p_earned_run_avg_plus")),
             "FIP": f(p.get("p_fip")), "WHIP": f(p.get("p_whip")), "SO": f(p.get("p_so")),
             "As_of": as_of,
+            "Qualified": qualified,
         })
+    return out
+
+
+def unplayed(r: dict, pid: str, season: int, team: str | None) -> dict:
+    """A season with a salary but no MLB games, modelled on the player's row r from another season."""
+    h = r["Role"] == "H"
+    zero = {k: 0 for k in (["G", "WAR", "PA", "HR", "SB"] if h else ["G", "WAR", "IP", "GS", "SV", "SO"])}
+    return {"Season": season, "bref_id": pid, "Player": r["Player"], "Team": team, "Traded": False, "Role": r["Role"],
+            "Pos": r["Pos"], "Age": r["Age"] + season - r["Season"], **zero, "As_of": r["As_of"], "Qualified": False}
+
+
+def salary_notes(pid: str) -> dict[int, tuple[str | None, str]]:
+    """{year: (team code of the first listed salary, all notes)} from a player's salary table."""
+    out: dict[int, tuple[str | None, str]] = {}
+    for r in table_rows(fetch(f"/players/{pid[0]}/{pid}.shtml"), "br-salaries"):
+        if re.fullmatch(r"\d{4}", r.get("year_ID", "")):
+            team, notes = out.get(int(r["year_ID"]), (TEAM_CODES.get(r.get("team_name")), ""))
+            out[int(r["year_ID"])] = (team, notes + " " + r.get("notes", ""))
     return out
 
 
@@ -289,6 +314,14 @@ def main() -> None:
         print(f"{season}: {len(got)} qualifying players", flush=True)
         rows += got
 
+    roles = {}
+    for r in rows:
+        roles.setdefault(r["bref_id"], []).append(r["Role"])
+    roles = {pid: max(set(rs), key=rs.count) for pid, rs in roles.items()}  # his usual role
+    under = [r for s in SEASONS for r in season_rows(s, roles)]
+    print(f"{len(under)} seasons under the cutoff by players who qualify in another", flush=True)
+    rows += under
+
     ids = sorted({r["bref_id"] for r in rows})
     print(f"Fetching salaries for {len(ids)} players (cached pages are instant)", flush=True)
     played_for: dict[str, dict[int, str]] = {}
@@ -301,6 +334,17 @@ def main() -> None:
         if i % 50 == 0:
             print(f"  {i}/{len(ids)}", flush=True)
 
+    # Seasons he was paid for but never played in the majors (a lost year to injury, mostly).
+    have = {(r["bref_id"], r["Season"]) for r in rows}
+    near = {}
+    for r in rows:
+        near.setdefault(r["bref_id"], []).append(r)
+    for pid in roles:
+        for s in SEASONS:
+            if (pid, s) not in have and pay[pid][0].get(s, (None,))[0]:
+                r = min(near[pid], key=lambda x: abs(x["Season"] - s))
+                rows.append(unplayed(r, pid, s, salary_notes(pid)[s][0]))
+
     for r in rows:
         r["Salary"], r["Service"], r["Salary_est"] = fill_gap(*pay[r["bref_id"]], r["Season"])
         if r["Service"] is not None:
@@ -308,13 +352,23 @@ def main() -> None:
         r["FA"], r["FA_option"] = contract(r["bref_id"])  # current status, the same on every row
         r["dWAR"] = fielding(r["bref_id"]).get(r["Season"]) if r["Role"] == "H" else None
 
+    # Under-cutoff seasons only count with a real listed salary: not an estimate, and not an option
+    # buyout (paid in a season he'd already left; Baseball-Reference notes those).
+    # ponytail: any buyout note that year drops the season, even one paid alongside a real salary.
+    rows = [r for r in rows if r["Qualified"] or (r["Salary"] and r["Salary"] >= 400_000 and not r["Salary_est"]
+                                                  and "buyout" not in salary_notes(r["bref_id"]).get(r["Season"], (None, ""))[1].lower())]
+    rows.sort(key=lambda r: (r["Season"], r["bref_id"]))
+
     # Track record: salaries are set on past seasons. No MLB time counts as 0 WAR.
     # ponytail: 2020's 60-game WAR isn't scaled up; it moved test R² by 0.01 either way.
-    war = {s: season_war(s) for s in range(min(SEASONS) - 5, max(SEASONS))}
+    war = {s: season_war(s) for s in range(min(SEASONS) - 5, max(SEASONS) + 1)}
     for r in rows:
         s, pid = r["Season"], r["bref_id"]
         r["WAR_prev"] = round(war[s - 1].get(pid, 0), 2)
         r["WAR_prev5"] = round(sum(war[y].get(pid, 0) for y in range(s - 5, s)), 2)
+        # Next season's WAR even if he doesn't qualify then, for the aging curve. None when there's
+        # no comparable next season (the newest, or 2019 -> the 60-game 2020).
+        r["WAR_next"] = round(war[s + 1].get(pid, 0), 2) if s + 1 in SEASONS else None
 
     with OUT.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))

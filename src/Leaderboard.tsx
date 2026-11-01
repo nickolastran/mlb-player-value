@@ -178,7 +178,9 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
                     <Headshot key={r.id} db={db} id={r.id} size={30} />
                     <span title={r.player} className="min-w-0 flex-initial! whitespace-normal sm:truncate">
                       {r.player}
-                      {tag?.(r) && <span className="ml-1.5 inline-block whitespace-nowrap rounded border border-line-strong px-1.5 text-xs font-normal text-muted">{tag(r)}</span>}
+                      {[tag?.(r), !r.qualified && (r.g ? "Short season" : "Didn't play")].filter(Boolean).map((t) => (
+                        <span key={String(t)} className="ml-1.5 inline-block whitespace-nowrap rounded border border-line-strong px-1.5 text-xs font-normal text-muted">{t}</span>
+                      ))}
                     </span>
                     <span className="max-sm:hidden">{teamLogo(r.team) ? <TeamLogo key={r.team} code={r.team} size={18} /> : <span className="text-sm text-muted">{r.team}</span>}</span>
                   </span>
@@ -331,8 +333,8 @@ export function CareerBoard({ db, model, team, pos, by, dir, current, onView, on
 
       <p className="mx-4 mt-auto max-w-[70ch] pt-2.5 text-[0.8125rem] text-muted">
         Every season from {seasons[0].label} to {latest.label} with a salary on record, in {latest.label} dollars (scaled by the tax threshold).
-        At least two seasons. Seasons below {db.manifest.min_pa} PA or {db.manifest.min_ip} IP, often injured ones, aren't counted, so the worst
-        contracts look better than they were.
+        At least two seasons. Seasons below {db.manifest.min_pa} PA or {db.manifest.min_ip} IP, often injured ones, count with their salary
+        and production value scaled to the time played.
       </p>
       <div className="flex flex-wrap gap-x-5 px-4 pb-1 pt-2.5">
         {!all && rows.length > BOARD_ROWS && (

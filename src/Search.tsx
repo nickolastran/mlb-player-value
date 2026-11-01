@@ -86,7 +86,7 @@ export function Search({ db, season, onPick, placeholder = "Search a player, e.g
           >
             {matches.length === 0 && (
               <li className="px-3 py-2.5 text-ink-2">
-                No qualifying player by that name. Hitters need {db.manifest.min_pa}+ PA and pitchers {db.manifest.min_ip}+ IP in a season.
+                No qualifying player by that name. Hitters need {db.manifest.min_pa}+ PA and pitchers {db.manifest.min_ip}+ IP in at least one season.
               </li>
             )}
             {matches.map((p, i) => {

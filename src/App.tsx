@@ -343,7 +343,7 @@ function Explorer({ db }: { db: Db }) {
           <SectionHead
             id="lookup-title"
             title="Player lookup"
-            note={`Search any hitter with ${db.manifest.min_pa}+ plate appearances or pitcher with ${db.manifest.min_ip}+ innings in a season, or click a dot on the charts below.`}
+            note={`Search any hitter with ${db.manifest.min_pa}+ plate appearances or pitcher with ${db.manifest.min_ip}+ innings in at least one season, or click a dot on the charts below.`}
           />
           <div className="flex items-start gap-3">
             <Search
@@ -408,7 +408,7 @@ function Explorer({ db }: { db: Db }) {
             <SectionHead
               id="fa-title"
               title="Free-agent watch"
-              note={`Players whose contracts run out after ${db.label(s.season)}, per Baseball-Reference. Predicted is what the model says this season was worth. Next is that, aged one year by how production value typically changes at his age: a rough yearly value for the next contract, in ${db.label(s.season)} dollars. An option for ${faYear} can keep a player off the market.`}
+              note={`Players whose contracts run out after ${db.label(s.season)}, per Baseball-Reference. Predicted is what the model says this season was worth. Next is that, aged one year by how production value typically changes at his age, counting the players who get hurt or lose their job: a rough yearly value for the next contract, in ${db.label(s.season)} dollars. An option for ${faYear} can keep a player off the market.`}
             />
             <Leaderboard
               db={db}

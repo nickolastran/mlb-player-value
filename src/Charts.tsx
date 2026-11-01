@@ -306,7 +306,7 @@ export function TeamBars({ db, season, model, team, pos }: { db: Db; season: num
     if (team === "all") {
       if (!db.hasSalary(season)) {
         return {
-          note: "Predicted minus actual salary, summed across each roster's qualifying players.",
+          note: "Predicted minus actual salary, summed across each roster's players, injured seasons included.",
           empty: `${db.label(season)} doesn't have actual salaries in the data yet. Pick an earlier season to see team surplus.`,
         };
       }
@@ -320,13 +320,13 @@ export function TeamBars({ db, season, model, team, pos }: { db: Db; season: num
       const teams = [...sums.entries()].sort((a, b) => b[1].usd - a[1].usd);
       const y = teams.map(([, v]) => v.usd / 1e6);
       return {
-        note: `${modelInfo.label} prediction minus actual salary, summed across each roster's qualifying ${who} in ${db.label(season)}. Blue teams got more production than they paid for. Traded players are left out because their salary can't be split by team.`,
+        note: `${modelInfo.label} prediction minus actual salary, summed across each roster's ${who}, injured seasons included, in ${db.label(season)}. Blue teams got more production than they paid for. Traded players are left out because their salary can't be split by team.`,
         data: [{
           type: "bar",
           x: teams.map(([t]) => t),
           y,
           marker: barStyle(y),
-          text: teams.map(([t, v]) => `<b>${escapeHtml(teamName(t))}</b><br>Surplus <b>${money(v.usd, true)}</b> (${pct(v.pct, true)} of CBT)<br>${v.n} qualifying players`),
+          text: teams.map(([t, v]) => `<b>${escapeHtml(teamName(t))}</b><br>Surplus <b>${money(v.usd, true)}</b> (${pct(v.pct, true)} of CBT)<br>${v.n} players`),
           hovertemplate: "%{text}<extra></extra>",
           textposition: "none",
         }] as Data[],
@@ -354,13 +354,13 @@ export function TeamBars({ db, season, model, team, pos }: { db: Db; season: num
     });
     const y = vals.map((v) => v.pct * 100);
     return {
-      note: `${teamName(team)}: ${modelInfo.label.toLowerCase()} prediction minus actual salary, summed across qualifying ${who} each season, as a share of that season's tax threshold so the years compare fairly. The outlined bar is the selected season. Traded players are left out.`,
+      note: `${teamName(team)}: ${modelInfo.label.toLowerCase()} prediction minus actual salary, summed across ${who}, injured seasons included, each season, as a share of that season's tax threshold so the years compare fairly. The outlined bar is the selected season. Traded players are left out.`,
       data: [{
         type: "bar",
         x: vals.map((v) => v.s.label),
         y,
         marker: { ...barStyle(y), line: { color: vals.map((v) => (v.s.season === season ? C.text : "rgba(0,0,0,0)")), width: 2 } },
-        text: vals.map((v) => `<b>${escapeHtml(teamName(team))}, ${v.s.label}</b><br>Surplus <b>${pct(v.pct, true)}</b> of CBT (${money(v.usd, true)})<br>${v.n} qualifying players`),
+        text: vals.map((v) => `<b>${escapeHtml(teamName(team))}, ${v.s.label}</b><br>Surplus <b>${pct(v.pct, true)}</b> of CBT (${money(v.usd, true)})<br>${v.n} players`),
         hovertemplate: "%{text}<extra></extra>",
         textposition: "none",
       }] as Data[],
@@ -456,7 +456,7 @@ export function TeamTrend({ db, season, model, team, pos }: { db: Db; season: nu
   return (
     <Figure
       title="Team surplus over time"
-      note={`${db.model(model).label} prediction minus actual salary, summed across each roster's qualifying ${who}, as a share of each season's tax threshold. ${key} Grey lines are the other teams; hover any line to name it. Traded players are left out.`}
+      note={`${db.model(model).label} prediction minus actual salary, summed across each roster's ${who} (injured seasons included), as a share of each season's tax threshold. ${key} Grey lines are the other teams; hover any line to name it. Traded players are left out.`}
     >
       <Plot data={plot.data} layout={plot.layout} className={cls} label="Line chart of each team's total surplus by season" />
       <details className="px-2 pb-2 text-[0.9375rem]">

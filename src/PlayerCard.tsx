@@ -35,11 +35,11 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
   const tags: string[] = [];
   if (!player.seasons.includes(season))
     tags.push(`Not in ${db.label(season)}: under ${db.manifest.min_pa} PA / ${db.manifest.min_ip} IP, or not in the majors.`);
-  tags.push({
+  tags.push(!base.qualified ? `${base.g ? "Short season" : "Didn't play"}: under ${db.manifest.min_pa} PA / ${db.manifest.min_ip} IP, usually injured. Priced but never trained on; production value is scaled to the time he played.` : {
     train: "Training row: the models saw this season (footnote b)",
     test: "Held-out test row: the models never saw this season",
     projection: base.salary != null ? `${info.label}: a season the models never saw` : `${info.label} projection: no actual salary on record`,
-  }[base.split]);
+  }[base.split!]);
 
   const line: [string | number | undefined, string][] = base.role === "H"
     ? [[base.pa, "PA"], [base.hr, "HR"], [`${rate(base.avg)}/${rate(base.obp)}/${rate(base.slg)}`, "AVG/OBP/SLG"], [base.ops_plus, "OPS+"], [base.war, "WAR"]]

@@ -7,9 +7,10 @@ const LINKS = [
   { label: "Website", href: "https://nickolastran.vercel.app/", icon: "https://cdn.jsdelivr.net/npm/lucide-static@1.52.0/icons/globe.svg" },
 ];
 
-export function Footer({ db }: { db: Db }) {
-  const seasons = db.manifest.seasons;
-  const latest = seasons[seasons.length - 1];
+const PAGES = [["terms", "Terms"], ["privacy", "Privacy"], ["changelog", "Changelog"]];
+
+export function Footer({ db }: { db: Db | null }) {
+  const latest = db?.manifest.seasons.at(-1);
 
   return (
     <footer className="mt-[72px] border-t border-line text-xs uppercase tracking-[0.06em] text-muted">
@@ -17,8 +18,16 @@ export function Footer({ db }: { db: Db }) {
         <div>
           <span>© {new Date().getFullYear()} Nickolas Tran · MLB Player Value</span>
           <p className="mt-1.5 text-[0.6875rem] text-muted/80">
-            Data: Baseball-Reference. Not affiliated with MLB. Data through {latest.label}, as of {new Date(`${db.manifest.as_of}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
+            Data: Baseball-Reference. Not affiliated with MLB.
+            {db && latest && <> Data through {latest.label}, as of {new Date(`${db.manifest.as_of}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.</>}
           </p>
+          <nav aria-label="Site information" className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
+            {PAGES.map(([path, label]) => (
+              <a key={path} href={import.meta.env.BASE_URL + path} className="underline decoration-line-strong underline-offset-[3px] transition-colors hover:text-chalk hover:decoration-chalk">
+                {label}
+              </a>
+            ))}
+          </nav>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {LINKS.map((l) => (

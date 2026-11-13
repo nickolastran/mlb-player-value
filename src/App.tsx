@@ -8,6 +8,7 @@ import { CareerBoard, Leaderboard, type CareerBy } from "./Leaderboard";
 import { Scatters, ServiceClasses, TeamBars, TeamTrend } from "./Charts";
 import { Method } from "./Method";
 import { Footer } from "./Footer";
+import { DOCS, DocPage, type DocId } from "./Pages";
 
 const WRAP = "mx-auto max-w-[1180px] px-[clamp(16px,4vw,32px)]";
 const SECTION = `${WRAP} pt-[clamp(32px,5vw,56px)]`;
@@ -18,6 +19,13 @@ export default function App() {
   useEffect(() => {
     loadDb().then(setDb, (e: Error) => setError(`${e.message}. Start the site with npm run dev so the data files can load.`));
   }, []);
+
+  // Text pages don't need the data, so they render right away.
+  const doc = Object.keys(DOCS).find((k) => location.pathname === import.meta.env.BASE_URL + k) as DocId | undefined;
+  if (doc) {
+    document.title = `${DOCS[doc].title} · ${TITLE}`;
+    return <><DocPage id={doc} /><Footer db={db} /></>;
+  }
 
   return (
     <MotionConfig reducedMotion="user">

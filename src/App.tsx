@@ -373,7 +373,7 @@ function Explorer({ db }: { db: Db }) {
               </button>
             )}
           </div>
-          <div className={`grid gap-5 max-[900px]:grid-cols-1 ${comparing ? "grid-cols-2" : "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"}`}>
+          <div className={`grid gap-5 max-[900px]:grid-cols-1 ${comparing ? "grid-cols-2" : "grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]"}`}>
             <div ref={cardRef} className="min-w-0 scroll-mt-24">
               <PlayerCard
                 db={db}

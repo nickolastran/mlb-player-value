@@ -90,7 +90,7 @@ function baseLayout(extra: Partial<Layout> = {}): Partial<Layout> {
 function axis(title: string, extra: Record<string, unknown> = {}) {
   return {
     title: { text: title, font: { size: 13, color: C.text2 }, standoff: 10 },
-    gridcolor: C.line, linecolor: C.lineStrong, zerolinecolor: C.lineStrong, zerolinewidth: 1,
+    gridcolor: C.line, linecolor: C.lineStrong, zerolinecolor: C.lineStrong, zerolinewidth: 1, zerolinelayer: "above traces" as const, // bar outlines would otherwise break it up
     tickfont: { color: C.muted, size: 12 }, automargin: true,
     ...extra,
   };

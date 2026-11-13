@@ -79,11 +79,15 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               <TeamLogo key={base.team} code={base.team} size={22} />
               {teamName(base.team)}
             </p>
-            <div className="overflow-hidden">
+            {/* relative: popLayout takes the outgoing name out of flow, and only a positioned box clips it */}
+            <div className="@container relative overflow-hidden">
               <AnimatePresence initial={false} mode="popLayout">
                 <motion.h3
                   key={player.id}
-                  className="text-[clamp(1.875rem,4vw,2.625rem)] font-extrabold uppercase leading-[0.98] tracking-[-0.015em] [overflow-wrap:anywhere]"
+                  // Shrink so the longest word fits the card's width; uppercase extrabold runs ~0.72em a letter.
+                  // ponytail: width estimate per letter, measure with canvas if odd names still break
+                  style={{ fontSize: `min(2.625rem, 100cqi / ${0.72 * Math.max(...player.name.split(/\s+/).map((w) => w.length))})` }}
+                  className="font-extrabold uppercase leading-[0.98] tracking-[-0.015em] [overflow-wrap:anywhere]"
                   initial={{ y: "105%" }}
                   animate={{ y: 0 }}
                   exit={{ y: "-105%" }}
@@ -125,7 +129,7 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
                   className={`relative cursor-pointer rounded-full border px-2.5 py-0.5 text-[0.8125rem] transition-colors ${on ? "border-bulb font-semibold text-bulb-ink" : "border-line-strong text-ink-2 hover:border-ink-2 hover:text-chalk"}`}
                 >
                   {on && (
-                    <motion.span layoutId="card-season-pill" className="absolute inset-0 rounded-full bg-bulb" transition={{ type: "spring", bounce: 0.18, duration: 0.4 }} />
+                    <motion.span layoutId={`card-season-pill-${player.id}`}className="absolute inset-0 rounded-full bg-bulb" transition={{ type: "spring", bounce: 0.18, duration: 0.4 }} />
                   )}
                   <span className="relative">{db.label(s)}</span>
                 </button>
@@ -141,12 +145,13 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_1fr_1.9fr_1fr_1fr] border-b border-line">
+      {/* Numbers scale with the card so the five columns fit a narrow one */}
+      <div className="@container grid grid-cols-[1fr_1fr_1.9fr_1fr_1fr] border-b border-line">
         {line.map(([v, label], i) => (
           <div key={label} className={`px-2 py-3.5 text-center max-sm:px-1 max-sm:py-3 ${i ? "border-l border-line" : ""}`}>
             <motion.span
               key={`${player.id}-${cardSeason}-${label}`}
-              className={`block font-bold leading-none tabular-nums ${label === "AVG/OBP/SLG" ? "text-[1.5rem] max-sm:text-[1.0625rem]" : "text-[1.75rem] max-sm:text-[1.375rem]"}`}
+              className={`block font-bold leading-none tabular-nums ${label === "AVG/OBP/SLG" ? "text-[min(1.5rem,4.8cqi)] max-sm:text-[1.0625rem]" : "text-[min(1.75rem,5.6cqi)] max-sm:text-[1.375rem]"}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: i * 0.05, ease: EASE }}

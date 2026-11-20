@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { C, featureLabel, money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId, type Rec } from "./lib";
+import { C, dealTerms, featureLabel, money, ordinal, pct, rate, teamColor, teamName, type Db, type ModelId, type Rec } from "./lib";
 import { EASE, Headshot, TeamLogo, Tween } from "./ui";
 
 const usd = (v: number) => money(v);
@@ -46,6 +46,8 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
     : [[base.ip, "IP"], [base.era?.toFixed(2), "ERA"], [base.so, "Strikeouts"], [base.pos === "RP" ? base.sv : base.gs, base.pos === "RP" ? "Saves" : "Starts"], [base.war, "WAR"]];
 
   const gap = rec.production.pred - rec.market.pred;
+  const deal = rec[model].deal;
+  const left = deal ? deal.end - Math.max(cardSeason, deal.start - 1) : 0; // an extension may not have started yet
   const details = (
     <>
       <Why r={rec[model]} label={db.model(model).label} />
@@ -230,6 +232,24 @@ export function PlayerCard({ db, playerId, cardSeason, season, model, onCardSeas
               : "The market model values him above his on-field production alone, usually because free agents with six-plus years of service get paid for past performance."}
           </p>
         </div>
+        {deal && (
+          <section aria-label="Contract verdict" className="mt-3.5 rounded-lg border border-line px-3.5 py-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+              <h4 className="font-semibold">Contract verdict</h4>
+              <span className={`text-[1.375rem] font-bold tabular-nums ${deal.surplus >= 0 ? "text-under" : "text-over"}`}>{usdSigned(deal.surplus)}</span>
+            </div>
+            <p className="mt-1 text-sm text-ink-2">
+              {dealTerms(deal)}, {deal.start}–{deal.end}: {usd(deal.total / deal.years)} a year on average. What the {db.model(model).label.toLowerCase()} model
+              says he's worth over the whole deal, minus what it pays him. {deal.surplus >= 0 ? "Worth it" : "Not worth it"}, on this model.
+            </p>
+            <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-sm tabular-nums">
+              <dt className="text-muted">Played ({deal.counted} {deal.counted === 1 ? "season" : "seasons"})</dt>
+              <dd className="text-right">{usdSigned(deal.to_date)}</dd>
+              <dt className="text-muted">Left ({left} {left === 1 ? "season" : "seasons"}, projected)</dt>
+              <dd className="text-right">{usdSigned(deal.remaining)}</dd>
+            </dl>
+          </section>
+        )}
         {compare ? (
           // Stacked on phones, two full cards bury the second player's numbers, so the extras start closed there.
           <details open={!matchMedia("(max-width: 900px)").matches} className="mt-3.5">

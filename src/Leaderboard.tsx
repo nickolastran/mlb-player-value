@@ -22,7 +22,7 @@ function downloadCsv(name: (string | false)[], lines: unknown[][]) {
   URL.revokeObjectURL(a.href);
 }
 
-export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, fill, current, onSort, onShowAll, onPick, only, title: heading, tag, next }: {
+export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, full, fill, current, onSort, onShowAll, onPick, only, title: heading, tag, next, deal }: {
   db: Db;
   season: number;
   model: ModelId;
@@ -40,6 +40,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
   title?: string; // replaces the sort-based title
   tag?: (r: Rec) => string | null | undefined; // a note beside the name
   next?: boolean; // show the next-contract estimate
+  deal?: boolean; // show the whole-contract surplus
 }) {
   const salary = db.hasSalary(season);
 
@@ -76,9 +77,11 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
 
   // Every row the filters and sort give, not just the ones shown.
   const download = () => downloadCsv([heading ?? `players ${season}`, db.model(model).short, team !== "all" && team, pos !== "all" && pos], [
-    ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Predicted low (80%)", "Predicted high (80%)", "Surplus", ...(next ? ["Next contract (est.)"] : []), ...(tag ? ["Note"] : [])],
+    ["Rank", "Player", "Team", "Pos", "Age", "Service", "WAR", "Salary", "Salary estimated", "Predicted", "Predicted low (80%)", "Predicted high (80%)", "Surplus", ...(next ? ["Next contract (est.)"] : []),
+      ...(deal ? ["Contract years", "Contract total", "Contract start", "Contract end", "Contract surplus to date", "Contract surplus remaining (est.)", "Contract surplus"] : []), ...(tag ? ["Note"] : [])],
     ...rows.map((r, i) => [
-      i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.pred_lo, r.pred_hi, r.surplus, ...(next ? [r.next] : []), ...(tag ? [tag(r)] : []),
+      i + 1, r.player, r.team, r.pos, r.age, r.service, r.war, r.salary, r.salary_est, r.pred, r.pred_lo, r.pred_hi, r.surplus, ...(next ? [r.next] : []),
+      ...(deal ? [r.deal?.years, r.deal?.total, r.deal?.start, r.deal?.end, r.deal?.to_date, r.deal?.remaining, r.deal?.surplus] : []), ...(tag ? [tag(r)] : []),
     ]),
   ]);
 
@@ -96,8 +99,10 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
     { key: "pred", label: "Predicted", num: true },
     { key: "surplus", label: "Surplus", num: true, salaryCol: true },
     { key: "next", label: "Next", num: true },
+    { key: "deal", label: "Contract", num: true },
   ];
-  const visible = cols.filter((c) => (salary || !c.salaryCol) && (next || c.key !== "next"));
+  const own = (k?: SortKey) => (k !== "next" || next) && (k !== "deal" || deal); // each board's extra column
+  const visible = cols.filter((c) => (salary || !c.salaryCol) && own(c.key));
   // No sideways scrolling: the player column takes what's left and long names truncate (wrap on phones,
   // which also drop age, WAR, predicted and team logos; any two of salary, predicted and surplus imply the third).
   // The sorted column always stays; salary makes room for it.
@@ -114,7 +119,7 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
         </h3>
         <div className="flex flex-none items-end gap-2 max-sm:w-full max-sm:[&>label]:flex-1">
           <Select small label="Sort by" value={sortKey} onChange={(v) => onSort(v as SortKey, SORTS[v as SortKey].natural)}>
-            {(Object.keys(SORTS) as SortKey[]).filter((k) => next || k !== "next").map((k) => (
+            {(Object.keys(SORTS) as SortKey[]).filter(own).map((k) => (
               <option key={k} value={k} disabled={!salary && SORTS[k].needsSalary}>
                 {k === "surplus" ? "Surplus" : SORTS[k].label[0].toUpperCase() + SORTS[k].label.slice(1)}
               </option>
@@ -195,6 +200,11 @@ export function Leaderboard({ db, season, model, team, pos, sortKey, sortDir, fu
                   </td>
                 )}
                 {next && <td className={`${cell} ${width("Next")} py-1.5 text-right tabular-nums`}>{money(r.next)}</td>}
+                {deal && (
+                  <td className={`${cell} py-1.5 text-right tabular-nums ${r.deal == null ? "" : r.deal.surplus >= 0 ? "text-under" : "text-over"}`}>
+                    {money(r.deal?.surplus, true)}
+                  </td>
+                )}
               </motion.tr>
             ))}
           </tbody>

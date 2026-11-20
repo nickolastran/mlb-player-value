@@ -2,7 +2,7 @@
 
 export type ModelId = "market" | "production";
 export type Unit = "usd" | "pct";
-export type SortKey = "surplus" | "pred" | "salary" | "war" | "age" | "next";
+export type SortKey = "surplus" | "pred" | "salary" | "war" | "age" | "next" | "deal";
 export type SortDir = "asc" | "desc";
 
 export interface Rec {
@@ -34,6 +34,7 @@ export interface Rec {
   fa?: number | null; // first free-agent season
   fa_option?: "team" | "player" | "mutual" | null; // an option covering that season
   next?: number; // pred aged one year: an estimate of the next contract's yearly value
+  deal?: Deal; // current multi-year contract and the model's verdict on it
   why: [string, number][]; // [model feature, dollars it adds to the prediction], biggest first; the rest is the role average
   comps?: [string, number][]; // [id, season] of the most similar paid seasons by other players; market file only
   // Hitters
@@ -52,6 +53,18 @@ export interface Rec {
   era_plus?: number;
   so?: number;
   whip?: number;
+}
+
+// Surplus over a whole contract at its average annual value: seasons played plus the rest projected.
+export interface Deal {
+  years: number;
+  total: number;
+  start: number; // first and last season
+  end: number;
+  counted: number; // seasons played that are in the data (2016 on, not 2020)
+  to_date: number;
+  remaining: number;
+  surplus: number; // to_date + remaining
 }
 
 export interface SeasonInfo {
@@ -276,6 +289,8 @@ export function pct(v: number | null | undefined, signed = false) {
   const sign = v < 0 ? "−" : signed && v > 0 ? "+" : "";
   return `${sign}${Math.abs(v * 100).toFixed(1)}%`;
 }
+// "13 yrs/$330M"
+export const dealTerms = (d: Deal) => `${d.years} yrs/${money(d.total)}`;
 export const rate = (v?: number | null) => (v == null ? "—" : v.toFixed(3).replace(/^0/, ""));
 export function ordinal(n: number) {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
@@ -305,4 +320,5 @@ export const SORTS: Record<SortKey, { label: string; natural: SortDir; needsSala
   war: { label: "WAR", natural: "desc", get: (r) => r.war },
   age: { label: "age", natural: "asc", get: (r) => r.age },
   next: { label: "next contract", natural: "desc", get: (r) => r.next ?? null }, // free-agent board only
+  deal: { label: "contract surplus", natural: "desc", get: (r) => r.deal?.surplus ?? null }, // contract board only
 };

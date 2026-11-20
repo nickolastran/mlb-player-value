@@ -50,6 +50,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import shap
+from scipy.optimize import curve_fit
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score
 from sklearn.neighbors import NearestNeighbors
@@ -172,6 +173,29 @@ def aging(df: pd.DataFrame) -> np.poly1d:
     return np.poly1d(np.polyfit(ratio.index, ratio, 1, w=np.sqrt(g.size())))
 
 
+def decline(df: pd.DataFrame):
+    """(age, k) -> share of a season's production value a player delivers k seasons later, an expected value:
+    injured seasons count pro-rated and players gone from the majors count zero. Fit in logs as a one-time
+    first-year drop (a good season partly regresses, some players get hurt or lose their job) plus a steady
+    per-year decline that steepens with age, fit to how much value each age kept 1-5 seasons on. Compounding the one-year aging line instead would repeat that
+    first-year drop every year: it kept 30% of a 29-32-year-old star's value after 4 years; real ones kept 59%."""
+    ages = lambda age, k: sum(min(max(age + i, AGES[0]), AGES[1]) for i in range(k))
+    later = df.set_index(["bref_id", "Season"])["pred_production"]
+    seasons, q = set(df["Season"]), df[df["Qualified"]]
+    X, y, w = [], [], []
+    for k in range(1, 6):  # longer spans all cross the missing 2020
+        ok = q[[all(s + i in seasons for i in range(k + 1)) for s in q["Season"]]]
+        got = later.reindex(list(zip(ok["bref_id"], ok["Season"] + k))).fillna(0).to_numpy()
+        for age, g in ok.assign(got=got).groupby(ok["Age"].clip(*AGES)):
+            X.append([k, ages(age, k)])
+            y.append(g["got"].sum() / g["pred_production"].sum())
+            w.append(len(g))
+    curve = lambda x, once, c0, c1: np.exp(once + c0 * x[0] + c1 * x[1])
+    # Fit the ratios themselves, not their logs: some old cells kept nothing at all.
+    (once, c0, c1), _ = curve_fit(curve, np.array(X).T, y, p0=(0, 0, 0), sigma=1 / np.sqrt(w))
+    return lambda age, k: float(curve((k, ages(age, k)), once, c0, c1))
+
+
 def comps(df: pd.DataFrame) -> pd.Series:
     """[[bref_id, season], ...] per row: the most similar seasons by other players in other seasons with a listed salary."""
     out = {}
@@ -195,7 +219,27 @@ def comps(df: pd.DataFrame) -> pd.Series:
     return pd.Series(out)
 
 
-def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[dict]:
+def verdict(df: pd.DataFrame, r: pd.Series, model: str, fade) -> dict:
+    """Surplus over a player's current deal, paid at its average annual value (AAV), so front- or
+    back-loading doesn't matter. Played seasons use the model's prediction (production value pro-rates
+    injured ones, so a lost year counts against the deal); the rest are his latest full season times
+    decline(), the value players like him actually kept that many years on. Nominal dollars, no discounting."""
+    years, start, end = int(r["Deal_years"]), int(r["Deal_start"]), int(r["Deal_end"])
+    aav, latest = r["Deal_total"] / years, df["Season"].max()
+    me = df[df["bref_id"] == r["bref_id"]].sort_values("Season")
+    # Seasons outside the data (before 2016, the left-out 2020) aren't counted.
+    played = me[me["Season"].between(start, latest)]
+    to_date = (played[f"pred_{model}"] * played["Season"].map(CBT) - aav).sum()
+    # ponytail: an injured latest season is priced off his last full one, so the remaining years
+    # assume he's healthy again (decline() still carries the average injury risk).
+    value = me.loc[me["Qualified"], f"pred_{model}"].iloc[-1] * CBT[latest]
+    # An extension that hasn't started yet still ages him in the meantime.
+    remaining = sum(value * fade(r["Age"], y - latest) - aav for y in range(max(start, latest + 1), end + 1))
+    return {"years": years, "total": num(r["Deal_total"]), "start": start, "end": end, "counted": len(played),
+            "to_date": int(round(to_date, -4)), "remaining": int(round(remaining, -4)), "surplus": int(round(to_date + remaining, -4))}
+
+
+def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d, fade) -> list[dict]:
     cbt = CBT[season]
     rows = df[df["Season"] == season].copy()
     rows["pred"] = rows[f"pred_{model}"] * cbt
@@ -243,6 +287,9 @@ def records(df: pd.DataFrame, season: int, model: str, grow: np.poly1d) -> list[
         if season == df["Season"].max() and pd.notna(r.get("FA")) and r["Qualified"]:
             rec.update(fa=num(r["FA"]), fa_option=r["FA_option"] if isinstance(r["FA_option"], str) else None,
                        next=int(round(r["pred"] * grow(min(max(r["Age"], AGES[0]), AGES[1])), -4)))
+        # A one-year deal's verdict is just this season's surplus, so only multi-year deals get one.
+        if season == df["Season"].max() and r["Deal_years"] >= 2:
+            rec["deal"] = verdict(df, r, model, fade)
         out.append(rec)
     return out
 
@@ -268,6 +315,9 @@ def main() -> None:
     grow = aging(df[df["Qualified"]])
     print(f"Aging: x{grow(27):.3f} at 27, x{grow(32):.3f} at 32, x{grow(36):.3f} at 36")
     assert grow(AGES[0]) > grow(AGES[1]), "aging line doesn't decline with age"
+    fade = decline(df)  # all rows: a later injured season counts, pro-rated
+    print(f"Decline (27, 32): x{fade(27, 1):.2f} / x{fade(32, 1):.2f} a year on, x{fade(27, 4):.2f} / x{fade(32, 4):.2f} four on")
+    assert all(fade(a, k) > fade(a, k + 1) for a in range(20, 40) for k in range(1, 15)), "decline() doesn't fall with time"
     df["comps"] = comps(df)
     assert df.loc[df["Qualified"], "comps"].map(len).ge(3).all(), "a player-season has fewer than 3 comparables; raise n_neighbors in comps()"
     df["comps"] = df["comps"].map(lambda c: c if isinstance(c, list) else [])
@@ -279,7 +329,7 @@ def main() -> None:
     for season in sorted(df["Season"].unique()):
         s = df[df["Season"] == season]
         for model in MODELS:
-            recs = records(df, int(season), model, grow)
+            recs = records(df, int(season), model, grow, fade)
             # residual and surplus are the same gap, opposite signs
             assert all(r["surplus"] is None or abs(r["residual_pct"] + r["surplus_pct"]) < 1e-4 for r in recs)
             assert all(r["pred_lo"] <= r["pred"] <= r["pred_hi"] for r in recs)

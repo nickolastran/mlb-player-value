@@ -182,8 +182,19 @@ def fielding(pid: str) -> dict[int, float | None]:
     return out
 
 
-def contract(pid: str) -> tuple[int | None, str | None]:
-    """(free-agency year, option type) from the page's current contract status.
+def deal(text: str) -> tuple[int, float, int, int] | None:
+    """(years, total dollars, first season, last season) of the newest deal in a contract status,
+    e.g. "Signed thru 2031, 13 yrs/$330M (19-31)". A pre-arb year listed before an extension
+    ("1 yr/$785k (26), 7 yrs/$105M (27-33)") is skipped: the extension is the commitment."""
+    found = re.findall(r"(\d+) yrs?/\$([\d.]+)([MkB]) \((\d\d)(?:-(\d\d))?\)", text)
+    if not found:
+        return None
+    years, amount, unit, start, end = found[-1]
+    return int(years), float(amount) * {"k": 1e3, "M": 1e6, "B": 1e9}[unit], 2000 + int(start), 2000 + int(end or start)
+
+
+def contract(pid: str) -> tuple[int | None, str | None, tuple[int, float, int, int] | None]:
+    """(free-agency year, option type, deal()) from the page's current contract status.
 
     Baseball-Reference's free-agency year ignores options, so an option covering
     that year ("& 27 team option") is returned alongside it.
@@ -191,14 +202,15 @@ def contract(pid: str) -> tuple[int | None, str | None]:
     page = fetch(f"/players/{pid[0]}/{pid}.shtml")
     i = page.find("Contract Status")
     if i < 0:
-        return None, None
+        return None, None, None
     text = html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", page[i:i + 1500])))
+    terms = deal(text.split("Service Time")[0])
     fa = re.search(r"Free Agent : (\d{4})", text)
     if not fa:
-        return None, None
+        return None, None, terms
     year = int(fa.group(1))
     opts = re.findall(r"& (\d\d)(?:-\d\d)? (team|player|mutual) option", text)
-    return year, next((kind for yy, kind in opts if 2000 + int(yy) == year), None)
+    return year, next((kind for yy, kind in opts if 2000 + int(yy) == year), None), terms
 
 
 def fill_gap(pay: dict, drafted: bool, season: int) -> tuple[float | None, float | None, bool]:
@@ -349,7 +361,9 @@ def main() -> None:
         r["Salary"], r["Service"], r["Salary_est"] = fill_gap(*pay[r["bref_id"]], r["Season"])
         if r["Service"] is not None:
             r["Service"] = round(r["Service"], 3)
-        r["FA"], r["FA_option"] = contract(r["bref_id"])  # current status, the same on every row
+        # Current status, the same on every row
+        r["FA"], r["FA_option"], terms = contract(r["bref_id"])
+        r["Deal_years"], r["Deal_total"], r["Deal_start"], r["Deal_end"] = terms or (None, None, None, None)
         r["dWAR"] = fielding(r["bref_id"]).get(r["Season"]) if r["Role"] == "H" else None
 
     # Under-cutoff seasons only count with a real listed salary: not an estimate, and not an option

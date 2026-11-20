@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
-import { loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type Rec, type SortDir, type SortKey, type Unit } from "./lib";
+import { dealTerms, loadDb, money, POSITIONS, SORTS, teamName, type Db, type ModelId, type Rec, type SortDir, type SortKey, type Unit } from "./lib";
 import { EASE, Headshot, Segmented, Select, SectionHead, TeamLogo, Tween } from "./ui";
 import { Search } from "./Search";
 import { PlayerCard, WhyGap } from "./PlayerCard";
@@ -96,7 +96,7 @@ function initialState(db: Db): State {
   const pos = p.get("pos");
   if (pos && pos in POSITIONS) s.pos = pos;
   const [sk, sd] = (p.get("sort") ?? "").split("-");
-  if (sk in SORTS && sk !== "next") s.sortKey = sk as SortKey; // next is the free-agent board's own
+  if (sk in SORTS && sk !== "next" && sk !== "deal") s.sortKey = sk as SortKey; // the free-agent and contract boards' own
   if (sd === "asc" || sd === "desc") s.sortDir = sd;
   const [cb, cd] = (p.get("careers") ?? "").split("-");
   if (cb === "career" || cb === "stint") s.careerBy = cb;
@@ -139,6 +139,8 @@ function Explorer({ db }: { db: Db }) {
   const [unit, setUnit] = useState<Unit>("usd");
   const [faSort, setFaSort] = useState<[SortKey, SortDir]>(["next", "desc"]);
   const [faAll, setFaAll] = useState(false);
+  const [dealSort, setDealSort] = useState<[SortKey, SortDir]>(["deal", "desc"]);
+  const [dealAll, setDealAll] = useState(false);
   const [picking, setPicking] = useState(false);
   const comparing = picking || s.vs != null;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -214,6 +216,7 @@ function Explorer({ db }: { db: Db }) {
   const faYear = s.season + 1;
   const isFa = (r: Rec) => r.fa === faYear;
   const hasFa = db.recs(s.season, s.model).some(isFa);
+  const hasDeal = (r: Rec) => r.deal != null;
   const rise = {
     hidden: { opacity: 0, y: 14 },
     show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
@@ -435,6 +438,34 @@ function Explorer({ db }: { db: Db }) {
               title={`Free agents after ${db.label(s.season)}`}
               tag={(r) => r.fa_option && `${r.fa_option} option`}
               next
+            />
+          </section>
+        )}
+
+        {db.recs(s.season, s.model).some(hasDeal) && (
+          <section id="contracts" aria-labelledby="contracts-title" className={SECTION}>
+            <SectionHead
+              id="contracts-title"
+              title="Contract verdicts"
+              note={`Is the whole deal worth it? Every multi-year contract players are on now, per Baseball-Reference, paid at its average annual value. Contract surplus is what the model says each season played was worth minus that average, plus the same for the seasons left: this season's value scaled by how much value players his age actually kept that many years on, counting the ones who got hurt or lost their job. Seasons before ${seasons[0].label} and 2020 aren't counted. Production value rarely tops $30M, so deals paying more than that a year can't come out ahead on it.`}
+            />
+            <Leaderboard
+              db={db}
+              season={s.season}
+              model={s.model}
+              team={s.team}
+              pos={s.pos}
+              sortKey={dealSort[0]}
+              sortDir={dealSort[1]}
+              full={dealAll}
+              current={s.player}
+              onSort={(k, d) => setDealSort([k, d])}
+              onShowAll={() => setDealAll(true)}
+              onPick={(id) => openPlayer(id, s.season, true)}
+              only={hasDeal}
+              title={dealSort[0] !== "deal" ? "Multi-year contracts" : dealSort[1] === "desc" ? "Best contracts" : "Worst contracts"}
+              tag={(r) => r.deal && `${dealTerms(r.deal)}, ${r.deal.start}–${String(r.deal.end).slice(2)}`}
+              deal
             />
           </section>
         )}
